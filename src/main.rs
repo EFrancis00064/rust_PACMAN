@@ -1,5 +1,9 @@
 // use bevy::core_pipeline::clear_color::ClearColorConfig;
 use bevy::{prelude::*, render::camera::ScalingMode};
+use ghost::GhostPlugin;
+
+mod ghost;
+
 
 #[derive(Component)]
 pub struct Player {
@@ -24,10 +28,10 @@ fn main() {
                     ..default()
                 })
         )
+        .add_plugins(GhostPlugin)
         .insert_resource(Money(100.0))
         .add_systems(Startup, setup)
-        .add_systems(Update, (character_movement, spawn_ghost))
-        
+        .add_systems(Update, character_movement)
         .run();
 }
 
@@ -97,33 +101,5 @@ fn character_movement(
         
         transform.translation.x += direction.horizontal * movement_amount;
         transform.translation.y += direction.vertical   * movement_amount;
-    }
-}
-
-fn spawn_ghost(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    input: Res<Input<KeyCode>>,
-    mut money: ResMut<Money>,
-    player: Query<&Transform, With<Player>>,
-) {
-    if !input.just_pressed(KeyCode::Space) {
-        return;
-    }
-
-    let player_transform = player.single();
-    if money.0 >= 10.0 {
-        money.0 -= 10.0;
-        info!("Spent $10 on a ghost, remaining money: ${:?}", money.0);
-
-        let texture = asset_server.load("BasicGhost.png");
-
-        commands.spawn((
-            SpriteBundle {
-                texture,
-                transform: *player_transform,
-                ..default()
-            },
-        ));
     }
 }
