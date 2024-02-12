@@ -13,3 +13,4 @@ opt-level = 3
 
 [dependencies]
 bevy = { version = "0.12.1", features = ["wayland"] }
+bevy-inspector-egui = "0.22.1"

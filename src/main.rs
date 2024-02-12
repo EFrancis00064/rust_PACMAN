@@ -1,5 +1,6 @@
 // use bevy::core_pipeline::clear_color::ClearColorConfig;
-use bevy::{prelude::*, render::camera::ScalingMode};
+use bevy::{input::common_conditions::input_toggle_active, prelude::*, render::camera::ScalingMode};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
 
 mod ghost;
@@ -28,8 +29,12 @@ fn main() {
                     ..default()
                 })
         )
+        .add_plugins(
+            WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
+        )
         .add_plugins(GhostPlugin)
         .insert_resource(Money(100.0))
+        .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6)))
         .add_systems(Startup, setup)
         .add_systems(Update, character_movement)
         .run();
