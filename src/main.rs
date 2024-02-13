@@ -2,9 +2,10 @@
 use bevy::{input::common_conditions::input_toggle_active, prelude::*, render::camera::ScalingMode};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
+use ui::GameUI;
 
 mod ghost;
-
+mod ui;
 
 #[derive(Component)]
 pub struct Player {
@@ -32,9 +33,9 @@ fn main() {
         .add_plugins(
             WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
         )
-        .add_plugins(GhostPlugin)
+        .add_plugins((GhostPlugin, GameUI))
         .insert_resource(Money(100.0))
-        .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6)))
+        .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6))) // this doesnt seem to be working
         .add_systems(Startup, setup)
         .add_systems(Update, character_movement)
         .run();
