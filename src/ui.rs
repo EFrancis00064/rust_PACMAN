@@ -20,12 +20,12 @@ fn spawn_game_ui(mut commands: Commands) {
             NodeBundle {
                 style: Style {
                     width: Val::Percent(100.0),
-                    height: Val::Percent(10.0),
+                    height: Val::Px(20.0),
                     align_items: AlignItems::Center,
                     padding: UiRect::all(Val::Px(10.0)),
                     ..default()
                 },
-                background_color: Color::BLUE.into(),
+                background_color: Color::BLACK.into(),
                 ..default()
             },
             Name::new("UI Root"),
@@ -36,7 +36,7 @@ fn spawn_game_ui(mut commands: Commands) {
                     text: Text::from_section(
                         "Money",
                         TextStyle {
-                            font_size: 32.0,
+                            font_size: 20.0,
                             ..default()
                         },
                     ),
