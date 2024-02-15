@@ -175,7 +175,11 @@ fn character_movement(
             info!("Directions: {:?} {:?} rotation degrees: {:?} + {:?} = {:?}", direction.horizontal, direction.vertical, rotation_h, rotation_v, rotation_degrees);
 
             transform.rotation = Quat::from_rotation_z(f32::to_radians(rotation_degrees));
-            //transform.rotate_z(f32::to_radians(rotation_degrees));
+
+            if rotation_degrees == 180.0 {
+                transform.rotate_x(std::f32::consts::PI); // flip along the x axis 180 degrees (so we are now seeing the 'back' of the image)
+                // - imagine it is a page of paper where the ink has seeped through perfectly
+            }
         }
     }
 }
