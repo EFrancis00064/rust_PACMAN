@@ -1,11 +1,14 @@
 // use bevy::core_pipeline::clear_color::ClearColorConfig;
-use bevy::{input::common_conditions::input_toggle_active, prelude::*};
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy::prelude::*;
+//use bevy::input::common_conditions::input_toggle_active;/
+//use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
 use ui::GameUI;
+use gamelogic::GameLogic;
 
 mod ghost;
 mod ui;
+mod gamelogic;
 
 #[derive(Component)]
 pub struct Player {
@@ -43,7 +46,7 @@ fn main() {
         /*.add_plugins(
             WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
         )*/
-        .add_plugins((GhostPlugin, GameUI))
+        .add_plugins((GhostPlugin, GameUI, GameLogic))
         .insert_resource(Money(100.0))
         .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6))) // this doesnt seem to be working
         .add_systems(Startup, setup)
@@ -70,7 +73,7 @@ fn setup(
         ..default()
     });*/
 
-    let background_texture = asset_server.load("Background.png");
+    let background_texture = asset_server.load("Background_single.png");
 
     commands.spawn(
         SpriteBundle {
