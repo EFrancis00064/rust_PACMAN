@@ -4,7 +4,7 @@ use bevy::prelude::*;
 //use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
 use ui::GameUI;
-use gamelogic::GameLogic;
+use gamelogic::GameLogicPlugin;
 
 mod ghost;
 mod ui;
@@ -36,7 +36,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "PACMAN in Bevy and Rust".into(),
-                        resolution: (450.0, 519.0).into(),
+                        resolution: (410.0, 470.0).into(),
                         resizable: false,
                         ..default()
                     }),
@@ -46,7 +46,7 @@ fn main() {
         /*.add_plugins(
             WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
         )*/
-        .add_plugins((GhostPlugin, GameUI, GameLogic))
+        .add_plugins((GhostPlugin, GameUI, GameLogicPlugin))
         .insert_resource(Money(100.0))
         .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6))) // this doesnt seem to be working
         .add_systems(Startup, setup)
@@ -78,7 +78,7 @@ fn setup(
     commands.spawn(
         SpriteBundle {
             sprite: Sprite {
-                custom_size: Some(Vec2::new(450.0, 499.0)),
+                custom_size: Some(Vec2::new(410.0, 455.0)),
 
                 ..default()
             },

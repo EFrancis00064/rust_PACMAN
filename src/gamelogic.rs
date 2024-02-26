@@ -20,7 +20,7 @@ pub struct BlockCell {
     block_type: BlockType,
     block_reward: BlockReward,
 }
-impl BlockCell {
+/*impl BlockCell {
     fn default() -> BlockCell {
         BlockCell {
             exit_path_count: 0,
@@ -28,22 +28,26 @@ impl BlockCell {
             block_reward: BlockReward::Nothing,
         }
     }
-}
-
-const BOARD_WIDTH: usize = 26;
-const BOARD_HEIGHT: usize = 28;
+}*/
 
 #[derive(Component)]
 pub struct GameLogic {
     pub game_blocks: [[BlockCell; BOARD_WIDTH]; BOARD_HEIGHT],
 }
 
-impl Plugin for GameLogic {
+const SCREEN_WIDTH_PX: f32 = 410.0;
+const SCREEN_HEIGHT_PX: f32 = 450.0;
+
+const BOARD_WIDTH: usize = 26;
+const BOARD_HEIGHT: usize = 29;
+
+pub struct GameLogicPlugin;
+
+impl Plugin for GameLogicPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_gameboard);
     }
 }
-
 fn setup_gameboard(mut commands: Commands) {
     
     let game_logic: GameLogic = GameLogic {
@@ -62,6 +66,7 @@ fn setup_gameboard(mut commands: Commands) {
             [P, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, P],
             [P, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, P],
             [P, P, P, P, P, P, W, W, P, P, P, P, W, W, P, P, P, P, W, W, P, P, P, P, P, P],
+            [W, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, W],
             [W, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, W],
             [W, W, W, W, W, P, W, W, P, P, P, P, P, P, P, P, P, P, W, W, P, W, W, W, W, W],
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W],
@@ -85,21 +90,46 @@ fn setup_gameboard(mut commands: Commands) {
         }
     };
 
-    for block_row in game_logic.game_blocks {
-        for mut block_cell in block_row {
-            block_cell = BlockCell {
-                exit_path_count: 0,
-                block_type: BlockType::Wall,
-                block_reward: BlockReward::Nothing,
-            }
-        }
-    }
+    // spawn the point token pattern based on the gameblocks
+    let mut row_index: u32 = 0;
+    let mut col_index: u32 = 0;
 
+    for block_row in game_logic.game_blocks {
+        for block_cell in block_row {
+            match block_cell.block_reward {
+                BlockReward::PointToken => {
+                    // block cell is a point token type
+                    // spawn a point token in the bevy commands
+                    commands.spawn(SpriteBundle {
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(5.0, 5.0)),
+                            
+                            ..default()
+                        },
+                        transform: Transform::from_xyz((((col_index as f32) * 15.0) - (SCREEN_WIDTH_PX / 2.0)) + 17.5,// - (SCREEN_WIDTH_PX / 2.0), 
+                        //(SCREEN_HEIGHT_PX - (row_index - (SCREEN_HEIGHT_PX / 2.0))) - 10.0,
+                        (((((BOARD_HEIGHT as u32 - 1) - row_index) as f32) * 15.0) - (SCREEN_HEIGHT_PX / 2.0)) + 5.0,
+                        0.1),
+                        ..default()
+                    });
+                },
+                _ => (),
+            }
+
+            col_index += 1;
+        }
+        row_index += 1;
+        col_index = 0;
+    }
+    
     commands.spawn(
         game_logic
     );
-}
 
+    
+
+
+}
 
 
 /*fn get_block_cell(pos: Vec2) {
