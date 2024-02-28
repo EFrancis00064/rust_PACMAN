@@ -50,7 +50,7 @@ fn main() {
         .insert_resource(Money(100.0))
         .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6))) // this doesnt seem to be working
         .add_systems(Startup, setup)
-        .add_systems(Update, (character_movement, animate_sprite))
+        .add_systems(Update, animate_sprite)
         .run();
 }
 
@@ -108,83 +108,6 @@ fn setup(
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
         Player { speed: 50.0 },
     ));
-}
-
-fn character_movement(
-    mut characters: Query<(&mut Transform, &Player)>,
-    input: Res<Input<KeyCode>>,
-    time: Res<Time>,
-) {
-    for (mut transform, player) in &mut characters {
-        let mut movement_amount = player.speed * time.delta_seconds();
-
-        struct Direction {
-            vertical: f32,
-            horizontal: f32,
-        }
-
-        let mut direction = Direction {vertical : 0.0, horizontal : 0.0};
-
-        // convert keycode into a direction
-        if input.pressed(KeyCode::Up) {
-            direction.vertical = 1.0;
-        }
-        if input.pressed(KeyCode::Down) {
-            direction.vertical = -1.0;
-        }
-        if input.pressed(KeyCode::Right) {
-            direction.horizontal = 1.0;
-        }
-        if input.pressed(KeyCode::Left) {
-            direction.horizontal = -1.0;
-        }
-
-        if direction.horizontal != 0.0 && direction.vertical != 0.0 {
-            // if both directions are present, we are going to diagon alley - move both x and y at a reduced rate (pythagoras)
-            movement_amount = ((movement_amount.powi(2)) / 2.0).sqrt();
-        }
-        
-        transform.translation.x += direction.horizontal * movement_amount;
-        transform.translation.y += direction.vertical   * movement_amount;
-
-        // update the rotation of the sprite based on the direction it is moving
-        // create an angle from the direction:
-        // direction.horizontal = 1 = 0 degrees
-        // direction.horizontal = -1 = 180 degrees
-        // direction.vertical = 1 = 90 degrees
-        // direction.vertical = -1 = 270 degrees
-
-        // 0 - ((direction horizontal x 90 degrees) - 90)
-        // 360 - (direction vertical x 90 degrees) + 180
-        if direction.horizontal != 0.0 || direction.vertical != 0.0 {
-
-            let rotation_h = 
-                if direction.horizontal != 0.0 {
-                    0.0 - ((direction.horizontal * 90.0) - 90.0)
-                } else {
-                    0.0
-                };
-            let rotation_v = 
-                if direction.vertical != 0.0 {
-                    360.0 - ((direction.vertical * 90.0) + 180.0)
-                } else {
-                    0.0
-                };
-            let rotation_degrees = rotation_h + rotation_v;
-
-            
-            //transform.look_to(Vec3::new(direction.horizontal, direction.vertical, 0.0), Vec3::Y);
-
-            info!("Directions: {:?} {:?} rotation degrees: {:?} + {:?} = {:?}", direction.horizontal, direction.vertical, rotation_h, rotation_v, rotation_degrees);
-
-            transform.rotation = Quat::from_rotation_z(f32::to_radians(rotation_degrees));
-
-            if rotation_degrees == 180.0 {
-                transform.rotate_x(std::f32::consts::PI); // flip along the x axis 180 degrees (so we are now seeing the 'back' of the image)
-                // - imagine it is a page of paper where the ink has seeped through perfectly
-            }
-        }
-    }
 }
 
 fn animate_sprite(
