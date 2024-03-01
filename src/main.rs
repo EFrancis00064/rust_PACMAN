@@ -4,16 +4,13 @@ use bevy::prelude::*;
 //use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
 use ui::GameUI;
-use gamelogic::GameLogicPlugin;
+use gamelogic::{GameLogicPlugin, Player, Direction};
 
 mod ghost;
 mod ui;
 mod gamelogic;
 
-#[derive(Component)]
-pub struct Player {
-    pub speed: f32,
-}
+
 
 #[derive(Resource)]
 pub struct Money(pub f32);
@@ -101,12 +98,13 @@ fn setup(
         
             texture_atlas: texture_atlas_handle,
             sprite: TextureAtlasSprite ::new(animation_indicies.first),
-        
+            transform: Transform::from_xyz(0.0, -40.0, 0.01),
+
             ..default()
         },
         animation_indicies,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player { speed: 50.0 },
+        Player { speed: 5.0, direction_of_travel: Direction {vertical: 0.0, horizontal: 0.0} },
     ));
 }
 
