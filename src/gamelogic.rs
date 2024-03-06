@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::Score;
+
 #[derive(Clone, Copy)]
 enum BlockType {
     Wall,
@@ -34,6 +36,9 @@ pub struct Player {
 }
 
 #[derive(Component)]
+pub struct PointTokenEntity;
+
+#[derive(Component)]
 pub struct GameLogic {
     pub game_blocks: [[BlockCell; BOARD_WIDTH]; BOARD_HEIGHT],
 }
@@ -49,7 +54,7 @@ pub struct GameLogicPlugin;
 impl Plugin for GameLogicPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_gameboard);
-        app.add_systems(Update, player_movement);
+        app.add_systems(Update, (player_movement, check_player_points_collision));
     }
 }
 fn setup_gameboard(mut commands: Commands) {
@@ -106,7 +111,7 @@ fn setup_gameboard(mut commands: Commands) {
                     // spawn a point token in the bevy commands
                     let screen_coords = get_screen_coords(col_index as f32, row_index as f32);
 
-                    commands.spawn(SpriteBundle {
+                    commands.spawn((SpriteBundle {
                         sprite: Sprite {
                             custom_size: Some(Vec2::new(5.0, 5.0)),
                             
@@ -117,7 +122,8 @@ fn setup_gameboard(mut commands: Commands) {
                             screen_coords.y,
                             0.1),
                         ..default()
-                    });
+                    },
+                    PointTokenEntity));
                 },
                 _ => (),
             }
@@ -131,9 +137,6 @@ fn setup_gameboard(mut commands: Commands) {
     commands.spawn(
         game_logic
     );
-
-    
-
 
 }
 
@@ -234,7 +237,38 @@ fn player_movement(
             player.direction_of_travel.vertical = 0.0;
         }
     }
-    
+}
+
+fn check_player_points_collision(
+    player_query: Query<&Transform, With<Player>>,
+    point_tokens_query: Query<(&Sprite, &Transform, Entity), With<PointTokenEntity>>,
+    mut commands: Commands,
+    mut score: ResMut<Score>,
+) {
+    let player = player_query.single();
+    let player_rect = Rect::from_center_size(Vec2 {x: player.translation.x, y: player.translation.y}, Vec2 {x: 21.0, y: 21.0});
+
+    //let player_bounding_rect = Rect::from_center_size(Vec2 {x: player.translation.x, y: player.translation.y}, Vec2 {x: 15.0, y: 15.0});
+    for (point_token_sprite, point_token_transform, point_token_entity) in point_tokens_query.iter() {
+        // check each object for a collision on the transforms
+
+        let size = 
+        match point_token_sprite.custom_size {
+            Some(size) => size,
+            None => Vec2 {x: 1.0, y: 1.0}
+        };
+
+        if check_collision(
+            Rect::from_center_size(
+                Vec2 {x: point_token_transform.translation.x, y: point_token_transform.translation.y},
+                size), 
+            player_rect)
+        {
+            score.0 += 1.0;
+            // collision occured - remove the entity and add the associated points to the score
+            commands.entity(point_token_entity).despawn();
+        }
+    }
 }
 
 /*
@@ -308,7 +342,7 @@ fn get_new_position(game_logic: &GameLogic, current_pos: Vec2, direction: Direct
             // check if the current row and col are valid
             if row < 0 || col < 0 || 
                 row >= BOARD_HEIGHT as i32 ||
-                row >= BOARD_WIDTH as i32 {
+                col >= BOARD_WIDTH as i32 {
                 // it is a wall
                 is_wall = true;
             } else {

@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 
-use crate::Money;
+use crate::Score;
 
 #[derive(Component)]
-pub struct MoneyText;
+pub struct ScoreText;
 
 pub struct GameUI;
 
@@ -42,13 +42,13 @@ fn spawn_game_ui(mut commands: Commands) {
                     ),
                     ..default()
                 },
-                MoneyText,
+                ScoreText,
             ));
         });
 }
 
-fn update_money_ui(mut texts: Query<&mut Text, With<MoneyText>>, money: Res<Money>) {
+fn update_money_ui(mut texts: Query<&mut Text, With<ScoreText>>, score: Res<Score>) {
     for mut text in &mut texts {
-        text.sections[0].value = format!("Score: {:?}", money.0);
+        text.sections[0].value = format!("Score: {:?}", score.0);
     }
 }

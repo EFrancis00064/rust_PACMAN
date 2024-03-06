@@ -13,7 +13,7 @@ mod gamelogic;
 
 
 #[derive(Resource)]
-pub struct Money(pub f32);
+pub struct Score(pub f32);
 
 #[derive(Component)]
 struct AnimationIndicies {
@@ -44,7 +44,7 @@ fn main() {
             WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
         )*/
         .add_plugins((GhostPlugin, GameUI, GameLogicPlugin))
-        .insert_resource(Money(100.0))
+        .insert_resource(Score(0.0))
         .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6))) // this doesnt seem to be working
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
