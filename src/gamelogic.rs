@@ -153,7 +153,7 @@ fn player_movement(
 
     let game_logic = game_logic_query.single();
 
-    let mut movement_amount = player.speed * time.delta_seconds();
+    let movement_amount = player.speed * time.delta_seconds();
 
     let mut pressed_direction = Direction {vertical : 0.0, horizontal : 0.0};
 
@@ -181,7 +181,7 @@ fn player_movement(
 
     if (pressed_direction.horizontal != 0.0 || pressed_direction.vertical != 0.0) && new_pos.1 {
         // valid new position
-        info!("Valid new position {:?},{:?}", new_pos.0.x, new_pos.0.y);
+        //info!("Valid new position {:?},{:?}", new_pos.0.x, new_pos.0.y);
 
         player.direction_of_travel = pressed_direction;
         let screen_pos = get_screen_coords(new_pos.0.x, new_pos.0.y);
@@ -222,9 +222,8 @@ fn player_movement(
         }
     } else {
         // continue moving if possible in the same direction as we were before
-        let new_pos2 = get_new_position(game_logic,
-            get_game_board_coords(Vec2{x: transform.translation.x, y: transform.translation.y}),
-            player.direction_of_travel, movement_amount);
+        let grid_pos = get_game_board_coords(Vec2 {x: transform.translation.x, y: transform.translation.y});
+        let new_pos2 = get_new_position(game_logic, grid_pos, player.direction_of_travel, movement_amount);
 
         if new_pos2.1 {
             // it is possible
@@ -235,6 +234,12 @@ fn player_movement(
             // stop moving
             player.direction_of_travel.horizontal = 0.0;
             player.direction_of_travel.vertical = 0.0;
+            
+            // snap to the block position so that we are directly on the path
+            let snapped_grid_pos = Vec2 {x: grid_pos.x.round(), y: grid_pos.y.round()};
+            let new_screen_pos = get_screen_coords(snapped_grid_pos.x, snapped_grid_pos.y);
+            transform.translation.x = new_screen_pos.x;
+            transform.translation.y = new_screen_pos.y;
         }
     }
 }
@@ -264,7 +269,7 @@ fn check_player_points_collision(
                 size), 
             player_rect)
         {
-            score.0 += 1.0;
+            score.0 += 10;
             // collision occured - remove the entity and add the associated points to the score
             commands.entity(point_token_entity).despawn();
         }
@@ -316,11 +321,21 @@ fn count_point_tokens_left(game_logic: GameLogic) -> u32 {
  * All coordinates are in gamelogic coordinates (not screen coords)
  */
 fn get_new_position(game_logic: &GameLogic, current_pos: Vec2, direction: Direction, distance: f32) -> (Vec2, bool) {
-    let mut new_pos = current_pos;
+    let next_snapped_pos = 
+        Vec2 {x: current_pos.x.round(), y: current_pos.y.round()};
+
+    let mut valid_pos = current_pos;
+    
+    // if the snapped position is close enough to the current position
+    if (next_snapped_pos.x - current_pos.x).abs() < distance {valid_pos.x = next_snapped_pos.x;}
+    if (next_snapped_pos.y - current_pos.y).abs() < distance {valid_pos.y = next_snapped_pos.y;}
+
+
+    let mut new_pos = valid_pos;
     new_pos.x += direction.horizontal * distance;
     new_pos.y += direction.vertical * distance;
 
-    let block_size = Vec2 {x: 0.9, y: 0.9};
+    let block_size = Vec2 {x: 0.99, y: 0.99};
 
     let collision_rect = Rect::from_center_size(new_pos, block_size);
 

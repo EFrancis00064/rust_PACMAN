@@ -13,7 +13,7 @@ mod gamelogic;
 
 
 #[derive(Resource)]
-pub struct Score(pub f32);
+pub struct Score(pub i32);
 
 #[derive(Component)]
 struct AnimationIndicies {
@@ -44,7 +44,7 @@ fn main() {
             WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
         )*/
         .add_plugins((GhostPlugin, GameUI, GameLogicPlugin))
-        .insert_resource(Score(0.0))
+        .insert_resource(Score(0))
         .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6))) // this doesnt seem to be working
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
@@ -104,7 +104,7 @@ fn setup(
         },
         animation_indicies,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player { speed: 5.0, direction_of_travel: Direction {vertical: 0.0, horizontal: 0.0} },
+        Player { speed: 6.0, direction_of_travel: Direction {vertical: 0.0, horizontal: 0.0} },
     ));
 }
 

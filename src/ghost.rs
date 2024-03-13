@@ -29,8 +29,8 @@ fn spawn_ghost(
     }
 
     let player_transform = player.single();
-    if score.0 >= 10.0 {
-        score.0 -= 10.0;
+    if score.0 >= 10 {
+        score.0 -= 10;
         info!("Spent $10 on a ghost, remaining money: ${:?}", score.0);
 
         let texture = asset_server.load("BasicGhost.png");
@@ -58,7 +58,7 @@ fn ghost_lifetime(
         ghost.lifetime.tick(time.delta());
 
         if ghost.lifetime.finished() {
-            score.0 += 15.0;
+            score.0 += 15;
 
             commands.entity(ghost_entity).despawn();
 
