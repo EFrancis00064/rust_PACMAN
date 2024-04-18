@@ -171,15 +171,118 @@ fn player_movement(
         pressed_direction.horizontal += -1.0;
     }
 
+
+    let current_pos = get_game_board_coords(Vec2{x: transform.translation.x, y: transform.translation.y});
+
+    let mut potential_pos: (Vec2, bool) = (Vec2{x:0.0, y:0.0}, true);
+
+    // compare pressed direction to current direction of travel (favor vertical direction changes)
+    if pressed_direction.vertical != 0.0 && pressed_direction.vertical != player.direction_of_travel.vertical {
+        // we are only looking at the vertical direction here
+        // we have pressed the opposite direction to which we were moving before, try to move back the way we have come
+        //  or we are changing direction down a hallway 
+        //  or we have been sat not moving at all
+
+        let vertical_direction = Direction{vertical: pressed_direction.vertical, horizontal: 0.0};
+
+        potential_pos = get_new_position_alt(game_logic, current_pos, vertical_direction, movement_amount);
+
+        if potential_pos.1 == false {
+            // set new player direction of travel
+            player.direction_of_travel = vertical_direction;
+
+            // snap horizontal position to the nearest whole number
+            potential_pos.0.x = potential_pos.0.x.round();
+        }
+    } 
+    
+    // now check the horizontal direction if the vertical was not fruitful
+    if potential_pos.1 && pressed_direction.horizontal != 0.0 && pressed_direction.horizontal != player.direction_of_travel.horizontal {
+    
+        let horizontal_direction = Direction{vertical: 0.0, horizontal: pressed_direction.horizontal};
+
+        potential_pos = get_new_position_alt(game_logic, current_pos, horizontal_direction, movement_amount);
+
+        if potential_pos.1 == false {
+            // set new player direction of travel
+            player.direction_of_travel = horizontal_direction;
+
+            // snap vertical position to the nearest whole number
+            potential_pos.0.y = potential_pos.0.y.round();
+        }
+    }
+
+    if potential_pos.1 {
+        // neither of the player inputs directions are valid or are maybe are not present
+        // for now then we will try to continue in the same direction as we were moving before
+
+        potential_pos = get_new_position_alt(game_logic, current_pos,
+            player.direction_of_travel, movement_amount);
+    }
+
+    if potential_pos.1 {
+        // we cannot move anymore - stop moving now!
+        player.direction_of_travel.horizontal = 0.0;
+        player.direction_of_travel.vertical = 0.0;
+        
+        // snap to the block position so that we are directly on the path
+        let snapped_grid_pos = Vec2 {x: current_pos.x.round(), y: current_pos.y.round()};
+        let new_screen_pos = get_screen_coords(snapped_grid_pos.x, snapped_grid_pos.y);
+        transform.translation.x = new_screen_pos.x;
+        transform.translation.y = new_screen_pos.y;
+
+    } else {
+        // we have found a valid new position, move to this position
+        let screen_pos = get_screen_coords(potential_pos.0.x, potential_pos.0.y);
+        transform.translation.x = screen_pos.x;
+        transform.translation.y = screen_pos.y;
+
+        // make sure the player sprite is facing the current direction
+
+        // update the rotation of the sprite based on the direction it is moving
+        // create an angle from the direction:
+        // direction.horizontal = 1 = 0 degrees
+        // direction.horizontal = -1 = 180 degrees
+        // direction.vertical = -1 = 90 degrees
+        // direction.vertical = 1 = 270 degrees
+
+        // 0 - ((direction horizontal x 90 degrees) - 90)
+        // 360 - (direction vertical x 90 degrees) + 180
+        if player.direction_of_travel.horizontal != 0.0 || player.direction_of_travel.vertical != 0.0 {
+
+            let rotation_h = 
+                if player.direction_of_travel.horizontal != 0.0 {
+                    0.0 - ((player.direction_of_travel.horizontal * 90.0) - 90.0)
+                } else {
+                    0.0
+                };
+            let rotation_v = 
+                if player.direction_of_travel.vertical != 0.0 {
+                    (player.direction_of_travel.vertical * 90.0) + 180.0
+                } else {
+                    0.0
+                };
+            let rotation_degrees = rotation_h + rotation_v;
+
+            transform.rotation = Quat::from_rotation_z(f32::to_radians(rotation_degrees));
+
+            if rotation_degrees == 180.0 {
+                transform.rotate_x(std::f32::consts::PI); // flip along the x axis 180 degrees (so we are now seeing the 'back' of the image)
+                // - imagine it is a page of paper where the ink has seeped through perfectly
+            }
+        }
+    }
+
+    /*
     // no input - continue in the same direction as before
     //let mut new_direction = player.direction_of_travel;
 
     // check if is it possible to move in the pressed direction
-    let new_pos = get_new_position(game_logic,
+    let new_pos = get_new_position_alt(game_logic,
         get_game_board_coords(Vec2{x: transform.translation.x, y: transform.translation.y}),
         pressed_direction, movement_amount);
 
-    if (pressed_direction.horizontal != 0.0 || pressed_direction.vertical != 0.0) && new_pos.1 {
+    if (pressed_direction.horizontal != 0.0 || pressed_direction.vertical != 0.0) && new_pos.1 == false {
         // valid new position
         //info!("Valid new position {:?},{:?}", new_pos.0.x, new_pos.0.y);
 
@@ -223,9 +326,9 @@ fn player_movement(
     } else {
         // continue moving if possible in the same direction as we were before
         let grid_pos = get_game_board_coords(Vec2 {x: transform.translation.x, y: transform.translation.y});
-        let new_pos2 = get_new_position(game_logic, grid_pos, player.direction_of_travel, movement_amount);
+        let new_pos2 = get_new_position_alt(game_logic, grid_pos, player.direction_of_travel, movement_amount);
 
-        if new_pos2.1 {
+        if new_pos2.1 == false {
             // it is possible
             let screen_pos = get_screen_coords(new_pos2.0.x, new_pos2.0.y);
             transform.translation.x = screen_pos.x;
@@ -241,7 +344,7 @@ fn player_movement(
             transform.translation.x = new_screen_pos.x;
             transform.translation.y = new_screen_pos.y;
         }
-    }
+    }*/
 }
 
 fn check_player_points_collision(
@@ -405,4 +508,63 @@ fn check_collision(object1: Rect, object2: Rect) -> bool {
 
     // if bottom of obj1 is inside top and bottom of obj2
      ((object1.max.y >= object2.min.y) && (object1.max.y <= object2.max.y)))
+}
+
+/**
+ * Attempt to get a new position given a current position, a direction and a distance
+ * Returns the new postion and if there was a collision
+ */
+fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Direction, distance: f32) -> (Vec2, bool) {
+
+    let mut return_val = (current_pos, false);
+    
+    let mut new_pos = current_pos;
+    new_pos.x += direction.horizontal * distance;
+    new_pos.y += direction.vertical * distance;
+    let collision_rect = Rect::from_center_size(new_pos, Vec2 {x: 1.0, y: 1.0});
+
+    let mut check_for_collision = false;
+
+    // get the cell coords of the cell that we are aiming for
+    let mut cell_to_check = new_pos.round();
+    cell_to_check.x += direction.horizontal;
+    cell_to_check.y += direction.vertical;
+
+    // verify if cell to check is out of bounds
+    if cell_to_check.x >= 0.0 && cell_to_check.x < (BOARD_WIDTH as f32) &&
+       cell_to_check.y >= 0.0 && cell_to_check.y < (BOARD_HEIGHT as f32) {
+        // cell coords are valid
+        let cell = game_logic.game_blocks[cell_to_check.y as usize][cell_to_check.x as usize];
+
+        match cell.block_type {
+            BlockType::Wall => {
+                // check collision of entity with this cell
+                check_for_collision = true;
+            },
+            _ => ()
+        }
+    } else {
+        check_for_collision = true;
+    }
+
+    if check_for_collision {
+        return_val.1 = check_collision(collision_rect,
+                                               Rect::from_center_size(Vec2{x: cell_to_check.x, y: cell_to_check.y}, collision_rect.size()));
+        // a collision occurred
+        if return_val.1 {
+            // set position to the nearest whole numbers in that direction
+            if direction.horizontal != 0.0 {
+                return_val.0.x = return_val.0.x.round();
+            } else if direction.vertical != 0.0 {
+                return_val.0.y = return_val.0.y.round();
+            }
+        }
+    }
+
+    if return_val.1 == false {
+        // no collision has occurred, update the new position
+        return_val.0 = new_pos;
+    }
+
+    return_val
 }
