@@ -176,6 +176,8 @@ fn player_movement(
 
     let mut potential_pos: (Vec2, bool) = (Vec2{x:0.0, y:0.0}, true);
 
+    const TURNING_THRESHOLD : f32 = 0.2;
+
     // compare pressed direction to current direction of travel (favor vertical direction changes)
     if pressed_direction.vertical != 0.0 && pressed_direction.vertical != player.direction_of_travel.vertical {
         // we are only looking at the vertical direction here
@@ -185,24 +187,80 @@ fn player_movement(
 
         let vertical_direction = Direction{vertical: pressed_direction.vertical, horizontal: 0.0};
 
-        potential_pos = get_new_position_alt(game_logic, current_pos, vertical_direction, movement_amount);
+        let mut skip_get_pos = false;
 
+        // if the player was not already going vertical (they are turning from a horizontal direction of travel to turn a 90 degree corner)
+        if player.direction_of_travel.vertical == 0.0 {
+            // check if they are close enough to the center coordinate of a cell (only allow turning down a corridor if we are close enough to it)
+            let rounded_pos = current_pos.round();
+            // don't let the turn happen if we are too far away from the center position -- ASSUMPTION: ALL CORRIDOORS ARE ONLY 1 BLOCK WIDE
+
+            let mut min_x = -TURNING_THRESHOLD;
+            let mut max_x = TURNING_THRESHOLD;
+            let diff = current_pos.x - rounded_pos.x;
+
+            // up is -1 down is +1 (opposite to the game board coords)
+            if pressed_direction.vertical == 1.0 {
+                min_x = 0.0;
+            } else if pressed_direction.vertical == -1.0 {
+                max_x = 0.0;
+            }
+
+            skip_get_pos = diff < min_x || diff > max_x;
+            potential_pos.1 = skip_get_pos;
+
+            //info!("Pressed vertical, was going horizontal  Skip:{:?}  Diff:{:?}  MinX:{:?}  MaxX:{:?}", skip_get_pos, diff, min_x, max_x);
+        }
+
+        // if no collision detected yet, get the new position
+        if skip_get_pos == false {
+            potential_pos = get_new_position_alt(game_logic, current_pos, vertical_direction, movement_amount);
+        }
+        
+        // check if there was any collision detected at all in this direction
         if potential_pos.1 == false {
+
             // set new player direction of travel
             player.direction_of_travel = vertical_direction;
 
             // snap horizontal position to the nearest whole number
             potential_pos.0.x = potential_pos.0.x.round();
         }
-    } 
+    }
     
     // now check the horizontal direction if the vertical was not fruitful
     if potential_pos.1 && pressed_direction.horizontal != 0.0 && pressed_direction.horizontal != player.direction_of_travel.horizontal {
     
         let horizontal_direction = Direction{vertical: 0.0, horizontal: pressed_direction.horizontal};
+        
+        let mut skip_get_pos = false;
 
-        potential_pos = get_new_position_alt(game_logic, current_pos, horizontal_direction, movement_amount);
+        // if the player was not already going horizontal (they are turning from a vertical direction of travel to turn a 90 degree corner)
+        if player.direction_of_travel.horizontal == 0.0 {
+            // check if they are close enough to the center coordinate of a cell (only allow turning down a corridor if we are close enough to it)
+            let rounded_pos = current_pos.round();
+            // don't let the turn happen if we are too far away from the center position -- ASSUMPTION: ALL CORRIDOORS ARE ONLY 1 BLOCK WIDE
 
+            let mut min_y = -TURNING_THRESHOLD;
+            let mut max_y = TURNING_THRESHOLD;
+            let diff = current_pos.y - rounded_pos.y;
+
+            if pressed_direction.horizontal == -1.0 {
+                min_y = 0.0;
+            } else if pressed_direction.horizontal == 1.0 {
+                max_y = 0.0;
+            }
+
+            skip_get_pos = diff < min_y || diff > max_y;
+            potential_pos.1 = skip_get_pos;
+        }
+
+        // if no collision detected yet, get the new position
+        if skip_get_pos == false {
+            potential_pos = get_new_position_alt(game_logic, current_pos, horizontal_direction, movement_amount);
+        }
+
+        // check if there was any collision detected at all in this direction
         if potential_pos.1 == false {
             // set new player direction of travel
             player.direction_of_travel = horizontal_direction;
@@ -527,6 +585,7 @@ fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Di
 
     // get the cell coords of the cell that we are aiming for
     let mut cell_to_check = new_pos.round();
+
     cell_to_check.x += direction.horizontal;
     cell_to_check.y += direction.vertical;
 
