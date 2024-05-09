@@ -199,10 +199,9 @@ fn player_movement(
             let mut max_x = TURNING_THRESHOLD;
             let diff = current_pos.x - rounded_pos.x;
 
-            // up is -1 down is +1 (opposite to the game board coords)
-            if pressed_direction.vertical == 1.0 {
+            if player.direction_of_travel.horizontal == -1.0 {
                 min_x = 0.0;
-            } else if pressed_direction.vertical == -1.0 {
+            } else if player.direction_of_travel.horizontal == 1.0 {
                 max_x = 0.0;
             }
 
@@ -245,9 +244,10 @@ fn player_movement(
             let mut max_y = TURNING_THRESHOLD;
             let diff = current_pos.y - rounded_pos.y;
 
-            if pressed_direction.horizontal == -1.0 {
+            // up is -1 down is +1 (opposite to the game board coords)
+            if player.direction_of_travel.vertical == -1.0 {
                 min_y = 0.0;
-            } else if pressed_direction.horizontal == 1.0 {
+            } else if player.direction_of_travel.vertical == 1.0 {
                 max_y = 0.0;
             }
 
