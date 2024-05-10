@@ -106,6 +106,24 @@ fn setup(
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
         Player { speed: 6.0, direction_of_travel: Direction {vertical: 0.0, horizontal: 0.0} },
     ));
+
+    
+    let warp_tunnel_texture = asset_server.load("warp_tunnels.png");
+    commands.spawn(
+        SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(410.0, 455.0)), // same size and position as the background
+
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0.0, -10.0, 0.011),
+                ..default()
+            },
+            texture: warp_tunnel_texture,
+            ..default()
+        }
+    );
 }
 
 fn animate_sprite(

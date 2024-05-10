@@ -6,6 +6,7 @@ use crate::Score;
 enum BlockType {
     Wall,
     Path,
+    Warp(u8,u8),
 }
 
 #[derive(Clone, Copy)]
@@ -66,8 +67,11 @@ fn setup_gameboard(mut commands: Commands) {
         game_blocks: {
             const W: BlockCell = BlockCell {exit_path_count: 0, block_type: BlockType::Wall, block_reward: BlockReward::Nothing};
             const P: BlockCell = BlockCell {exit_path_count: 2, block_type: BlockType::Path, block_reward: BlockReward::PointToken};
+            const Q: BlockCell = BlockCell {exit_path_count: 2, block_type: BlockType::Path, block_reward: BlockReward::Nothing}; // a path but with no point token
+            const X: BlockCell = BlockCell {exit_path_count: 2, block_type: BlockType::Warp(25,13), block_reward: BlockReward::Nothing}; // X warps to Y
+            const Y: BlockCell = BlockCell {exit_path_count: 2, block_type: BlockType::Warp(0, 13), block_reward: BlockReward::Nothing}; // Y warps to X
 
-            [[P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P], // r0
+           [[P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P], // r0
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r1
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r2
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r3
@@ -80,7 +84,7 @@ fn setup_gameboard(mut commands: Commands) {
             [W, W, W, W, W, P, W, W, P, P, P, P, P, P, P, P, P, P, W, W, P, W, W, W, W, W], // r10
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r11
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r12
-            [P, P, P, P, P, P, P, P, P, W, W, W, W, W, W, W, W, P, P, P, P, P, P, P, P, P], // r13
+            [X, Q, P, P, P, P, P, P, P, W, W, W, W, W, W, W, W, P, P, P, P, P, P, P, Q, Y], // r13
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r14
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r15
             [W, W, W, W, W, P, W, W, P, P, P, P, P, P, P, P, P, P, W, W, P, W, W, W, W, W], // r16
@@ -120,7 +124,7 @@ fn setup_gameboard(mut commands: Commands) {
                         transform: Transform::from_xyz(
                             screen_coords.x,
                             screen_coords.y,
-                            0.1),
+                            0.0105), // this should be below the warp tunnel z but above the character z level
                         ..default()
                     },
                     PointTokenEntity));
@@ -599,6 +603,12 @@ fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Di
             BlockType::Wall => {
                 // check collision of entity with this cell
                 check_for_collision = true;
+            },
+            BlockType::Warp(x, y) => {
+                info!("Warp block intercepted {:?},{:?}", x, y);
+
+                // warp the character to the x and y values
+                new_pos = Vec2 {x: x as f32, y: y as f32};
             },
             _ => ()
         }
