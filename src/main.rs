@@ -40,9 +40,9 @@ fn main() {
                     ..default()
                 })
         )
-        /*.add_plugins(
-            WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
-        )*/
+        //.add_plugins(
+        //    WorldInspectorPlugin::default(),
+        //)
         .add_plugins((GhostPlugin, GameUI, GameLogicPlugin))
         .insert_resource(Score(0))
         .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6))) // this doesnt seem to be working
@@ -57,18 +57,8 @@ fn setup(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
     let camera = Camera2dBundle::default();
-    /*camera.projection.scaling_mode = ScalingMode::AutoMin {
-        min_width: 600.0,
-        min_height: 600.0,
-    };*/
 
     commands.spawn(camera);
-    /*commands.spawn(Camera2dBundle {
-        camera_2d: Camera2d {
-            clear_color: ClearColorConfig::Custom(Color::GREEN),
-        },
-        ..default()
-    });*/
 
     let background_texture = asset_server.load("Background_single.png");
 
@@ -88,16 +78,23 @@ fn setup(
         }
     );
 
-    let texture_handle = asset_server.load("Pacman_SpriteSheet.png");
-    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(21.0, 21.0), 1, 5, None, None);
-    let texture_atlas_handle = texture_atlases.add(texture_atlas);
+    
+
     let animation_indicies = AnimationIndicies {first: 0, last: 4};
+
+    let mut pac_sprite = TextureAtlasSprite ::new(animation_indicies.first);
+    pac_sprite.custom_size = Some(Vec2::new(21.0, 20.0)); // had to do this because the sprite was showing one pixel row too many (first row of next frame)
 
     commands.spawn((
         SpriteSheetBundle {
-        
-            texture_atlas: texture_atlas_handle,
-            sprite: TextureAtlasSprite ::new(animation_indicies.first),
+            texture_atlas: texture_atlases.add(
+                TextureAtlas::from_grid(
+                    asset_server.load("Pacman_SpriteSheet.png"),
+                    Vec2::new(21.0, 21.0),
+                    1, 5, None, None
+                )),
+            //sprite: TextureAtlasSprite ::new(animation_indicies.first),
+            sprite: pac_sprite,
             transform: Transform::from_xyz(0.0, -40.0, 0.01),
 
             ..default()
@@ -107,8 +104,6 @@ fn setup(
         Player { speed: 6.0, direction_of_travel: Direction {vertical: 0.0, horizontal: 0.0} },
     ));
 
-    
-    let warp_tunnel_texture = asset_server.load("warp_tunnels.png");
     commands.spawn(
         SpriteBundle {
             sprite: Sprite {
@@ -120,7 +115,7 @@ fn setup(
                 translation: Vec3::new(0.0, -10.0, 0.011),
                 ..default()
             },
-            texture: warp_tunnel_texture,
+            texture: asset_server.load("warp_tunnels.png"),
             ..default()
         }
     );

@@ -334,79 +334,6 @@ fn player_movement(
             }
         }
     }
-
-    /*
-    // no input - continue in the same direction as before
-    //let mut new_direction = player.direction_of_travel;
-
-    // check if is it possible to move in the pressed direction
-    let new_pos = get_new_position_alt(game_logic,
-        get_game_board_coords(Vec2{x: transform.translation.x, y: transform.translation.y}),
-        pressed_direction, movement_amount);
-
-    if (pressed_direction.horizontal != 0.0 || pressed_direction.vertical != 0.0) && new_pos.1 == false {
-        // valid new position
-        //info!("Valid new position {:?},{:?}", new_pos.0.x, new_pos.0.y);
-
-        player.direction_of_travel = pressed_direction;
-        let screen_pos = get_screen_coords(new_pos.0.x, new_pos.0.y);
-        transform.translation.x = screen_pos.x;
-        transform.translation.y = screen_pos.y;
-    
-        // update the rotation of the sprite based on the direction it is moving
-        // create an angle from the direction:
-        // direction.horizontal = 1 = 0 degrees
-        // direction.horizontal = -1 = 180 degrees
-        // direction.vertical = -1 = 90 degrees
-        // direction.vertical = 1 = 270 degrees
-
-        // 0 - ((direction horizontal x 90 degrees) - 90)
-        // 360 - (direction vertical x 90 degrees) + 180
-        if pressed_direction.horizontal != 0.0 || pressed_direction.vertical != 0.0 {
-
-            let rotation_h = 
-                if pressed_direction.horizontal != 0.0 {
-                    0.0 - ((pressed_direction.horizontal * 90.0) - 90.0)
-                } else {
-                    0.0
-                };
-            let rotation_v = 
-                if pressed_direction.vertical != 0.0 {
-                    (pressed_direction.vertical * 90.0) + 180.0
-                } else {
-                    0.0
-                };
-            let rotation_degrees = rotation_h + rotation_v;
-
-            transform.rotation = Quat::from_rotation_z(f32::to_radians(rotation_degrees));
-
-            if rotation_degrees == 180.0 {
-                transform.rotate_x(std::f32::consts::PI); // flip along the x axis 180 degrees (so we are now seeing the 'back' of the image)
-                // - imagine it is a page of paper where the ink has seeped through perfectly
-            }
-        }
-    } else {
-        // continue moving if possible in the same direction as we were before
-        let grid_pos = get_game_board_coords(Vec2 {x: transform.translation.x, y: transform.translation.y});
-        let new_pos2 = get_new_position_alt(game_logic, grid_pos, player.direction_of_travel, movement_amount);
-
-        if new_pos2.1 == false {
-            // it is possible
-            let screen_pos = get_screen_coords(new_pos2.0.x, new_pos2.0.y);
-            transform.translation.x = screen_pos.x;
-            transform.translation.y = screen_pos.y;
-        } else {
-            // stop moving
-            player.direction_of_travel.horizontal = 0.0;
-            player.direction_of_travel.vertical = 0.0;
-            
-            // snap to the block position so that we are directly on the path
-            let snapped_grid_pos = Vec2 {x: grid_pos.x.round(), y: grid_pos.y.round()};
-            let new_screen_pos = get_screen_coords(snapped_grid_pos.x, snapped_grid_pos.y);
-            transform.translation.x = new_screen_pos.x;
-            transform.translation.y = new_screen_pos.y;
-        }
-    }*/
 }
 
 fn check_player_points_collision(
@@ -444,7 +371,7 @@ fn check_player_points_collision(
 /*
  * Get screen coords of the given col and row (gameboard position)
  */
-fn get_screen_coords(col_index: f32, row_index: f32) -> Vec2 {
+pub fn get_screen_coords(col_index: f32, row_index: f32) -> Vec2 {
     Vec2 {
         x: ((col_index * 15.0) - (SCREEN_WIDTH_PX / 2.0)) + 17.5,
         y: ((((BOARD_HEIGHT as f32 - 1.0) - row_index) * 15.0) - (SCREEN_HEIGHT_PX / 2.0)) + 5.0
@@ -454,7 +381,7 @@ fn get_screen_coords(col_index: f32, row_index: f32) -> Vec2 {
 /*
  * Get the gameboard coordinates of the given screen position
  */
-fn get_game_board_coords(pos: Vec2) -> Vec2 {
+pub fn get_game_board_coords(pos: Vec2) -> Vec2 {
     Vec2 {
         x: ((pos.x - 17.5) + (SCREEN_WIDTH_PX / 2.0)) / 15.0,
         y: (BOARD_HEIGHT as f32 - 1.0) - (((pos.y - 5.0) + (SCREEN_HEIGHT_PX / 2.0)) / 15.0)
@@ -485,7 +412,7 @@ fn count_point_tokens_left(game_logic: GameLogic) -> u32 {
  * Get a new position going the given distance in the given direction starting from the current_pos
  * All coordinates are in gamelogic coordinates (not screen coords)
  */
-fn get_new_position(game_logic: &GameLogic, current_pos: Vec2, direction: Direction, distance: f32) -> (Vec2, bool) {
+pub fn get_new_position(game_logic: &GameLogic, current_pos: Vec2, direction: Direction, distance: f32) -> (Vec2, bool) {
     let next_snapped_pos = 
         Vec2 {x: current_pos.x.round(), y: current_pos.y.round()};
 
@@ -557,7 +484,7 @@ fn get_new_position(game_logic: &GameLogic, current_pos: Vec2, direction: Direct
  * - Can fail to detect a collision if object2 is smaller than object1
  * Returns true if collision
  */
-fn check_collision(object1: Rect, object2: Rect) -> bool {
+pub fn check_collision(object1: Rect, object2: Rect) -> bool {
 
     // if left of obj1 is inside left and right of obj2
     (((object1.min.x >= object2.min.x) && (object1.min.x <= object2.max.x)) ||
