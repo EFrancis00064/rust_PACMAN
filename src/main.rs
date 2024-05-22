@@ -1,5 +1,7 @@
+use std::thread::current;
+
 // use bevy::core_pipeline::clear_color::ClearColorConfig;
-use bevy::prelude::*;
+use bevy::{ecs::schedule::MultiThreadedExecutor, prelude::*};
 //use bevy::input::common_conditions::input_toggle_active;/
 //use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
@@ -15,6 +17,9 @@ mod gamelogic;
 #[derive(Resource)]
 pub struct Score(pub i32);
 
+#[derive(Resource)]
+pub struct CurrentColour(Color);
+
 #[derive(Component)]
 struct AnimationIndicies {
     first: usize,
@@ -24,6 +29,8 @@ struct AnimationIndicies {
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
 
+#[derive(Component)]
+struct MultiColoured;
 
 fn main() {
     App::new()
@@ -45,9 +52,10 @@ fn main() {
         //)
         .add_plugins((GhostPlugin, GameUI, GameLogicPlugin))
         .insert_resource(Score(0))
-        .insert_resource(ClearColor(Color::rgb(0.9, 0.3, 0.6))) // this doesnt seem to be working
+        .insert_resource(CurrentColour(Color::rgb(0.0, 0.0, 1.0)))
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
+        .add_systems(Update, update_multi_colours)
         .run();
 }
 
@@ -62,10 +70,11 @@ fn setup(
 
     let background_texture = asset_server.load("Background_single.png");
 
-    commands.spawn(
+    commands.spawn((
         SpriteBundle {
             sprite: Sprite {
                 custom_size: Some(Vec2::new(410.0, 455.0)),
+                color: Color::Rgba{red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0},
 
                 ..default()
             },
@@ -75,8 +84,9 @@ fn setup(
             },
             texture: background_texture,
             ..default()
-        }
-    );
+        },
+        MultiColoured,
+    ));
 
     
 
@@ -104,10 +114,11 @@ fn setup(
         Player { speed: 6.0, direction_of_travel: Direction {vertical: 0.0, horizontal: 0.0} },
     ));
 
-    commands.spawn(
+    commands.spawn((
         SpriteBundle {
             sprite: Sprite {
                 custom_size: Some(Vec2::new(410.0, 455.0)), // same size and position as the background
+                color: Color::Rgba { red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0 },
 
                 ..default()
             },
@@ -117,8 +128,9 @@ fn setup(
             },
             texture: asset_server.load("warp_tunnels.png"),
             ..default()
-        }
-    );
+        },
+        MultiColoured,
+    ));
 }
 
 fn animate_sprite(
@@ -138,5 +150,65 @@ fn animate_sprite(
                 sprite.index + 1
             };
         }
+    }
+}
+
+fn update_multi_colours (
+    time: Res<Time>,
+    mut query: Query<&mut Sprite, With<MultiColoured>>,
+    mut current_colour: ResMut<CurrentColour>,
+) {
+
+    let update_amount = time.delta_seconds() / 2.0;
+
+    let mut r = current_colour.0.r();
+    let mut g = current_colour.0.g();
+    let mut b = current_colour.0.b();
+
+    if (b * 255.0).round() == 0.0 && (g * 255.0).round() < 255.0 {
+        r -= update_amount;
+        if r < 0.0 {
+            r = 0.0;
+        }
+        
+        g += update_amount;
+        if g > 1.0 {
+            g = 1.0;
+        }
+
+        current_colour.0.set_r(r);
+        current_colour.0.set_g(g);
+
+    } else if (r * 255.0).round() == 0.0 && (b * 255.0).round() < 255.0 {
+        g -= update_amount;
+        if g < 0.0 {
+            g = 0.0;
+        }
+
+        b += update_amount;
+        if b > 1.0 {
+            b = 1.0;
+        }
+
+        current_colour.0.set_g(g);
+        current_colour.0.set_b(b);
+
+    } else if (g * 255.0).round() == 0.0 && (r * 255.0).round() < 255.0 {
+        b -= update_amount;
+        if b < 0.0 {
+            b = 0.0;
+        }
+
+        r += update_amount;
+        if r > 1.0 {
+            r = 1.0;
+        }
+
+        current_colour.0.set_b(b);
+        current_colour.0.set_r(r);
+    }
+    
+    for mut sprite in &mut query {
+        sprite.color = current_colour.0;
     }
 }
