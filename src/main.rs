@@ -6,7 +6,7 @@ use bevy::{ecs::schedule::MultiThreadedExecutor, prelude::*};
 //use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
 use ui::GameUI;
-use gamelogic::{GameLogicPlugin, Player, Direction};
+use gamelogic::{Direction, GameLogicPlugin, Horizontal, Player, Vertical};
 
 mod ghost;
 mod ui;
@@ -111,7 +111,7 @@ fn setup(
         },
         animation_indicies,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player { speed: 6.0, direction_of_travel: Direction {vertical: 0.0, horizontal: 0.0} },
+        Player { speed: 6.0, direction_of_travel: Direction {vertical: Vertical::Zero, horizontal: Horizontal::Zero} },
     ));
 
     commands.spawn((

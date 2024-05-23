@@ -24,10 +24,18 @@ pub struct BlockCell {
     block_reward: BlockReward,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum Vertical {Up = -1, Down = 1, Zero = 0}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum Horizontal {Left = -1, Right = 1, Zero = 0}
+
 #[derive(Clone, Copy)]
 pub struct Direction {
-    pub vertical: f32,
-    pub horizontal: f32
+    pub vertical: Vertical,
+    pub horizontal: Horizontal,
+    //pub vertical: f32,
+    //pub horizontal: f32
 }
 
 #[derive(Component)]
@@ -159,20 +167,31 @@ fn player_movement(
 
     let movement_amount = player.speed * time.delta_seconds();
 
-    let mut pressed_direction = Direction {vertical : 0.0, horizontal : 0.0};
+    /*struct InputDirection {
+        vertical: f32,
+        horizontal: f32,
+    }*/
+
+    let mut pressed_direction = Direction {vertical : Vertical::Zero, horizontal : Horizontal::Zero};
 
     // convert keycode into a direction
     if input.pressed(KeyCode::Up) {
-        pressed_direction.vertical += -1.0;
+        pressed_direction.vertical = Vertical::Up;
     }
     if input.pressed(KeyCode::Down) {
-        pressed_direction.vertical += 1.0;
+        pressed_direction.vertical = match pressed_direction.vertical {
+            Vertical::Up => { Vertical::Zero }, // pressing up and down together cancel out
+            _ => { Vertical::Down }
+        }
     }
     if input.pressed(KeyCode::Right) {
-        pressed_direction.horizontal += 1.0;
+        pressed_direction.horizontal = Horizontal::Right;
     }
     if input.pressed(KeyCode::Left) {
-        pressed_direction.horizontal += -1.0;
+        pressed_direction.horizontal = match pressed_direction.horizontal {
+            Horizontal::Right => { Horizontal::Zero }, // pressing left and right together cancel out
+            _ => { Horizontal::Left }
+        }
     }
 
 
@@ -180,39 +199,25 @@ fn player_movement(
 
     let mut potential_pos: (Vec2, bool) = (Vec2{x:0.0, y:0.0}, true);
 
-    const TURNING_THRESHOLD : f32 = 0.2;
-
     // compare pressed direction to current direction of travel (favor vertical direction changes)
-    if pressed_direction.vertical != 0.0 && pressed_direction.vertical != player.direction_of_travel.vertical {
+    if pressed_direction.vertical != Vertical::Zero && pressed_direction.vertical != player.direction_of_travel.vertical {
         // we are only looking at the vertical direction here
         // we have pressed the opposite direction to which we were moving before, try to move back the way we have come
         //  or we are changing direction down a hallway 
         //  or we have been sat not moving at all
 
-        let vertical_direction = Direction{vertical: pressed_direction.vertical, horizontal: 0.0};
+        let vertical_direction = Direction{vertical: pressed_direction.vertical, horizontal: Horizontal::Zero};
 
         let mut skip_get_pos = false;
 
         // if the player was not already going vertical (they are turning from a horizontal direction of travel to turn a 90 degree corner)
-        if player.direction_of_travel.vertical == 0.0 {
+        if player.direction_of_travel.vertical == Vertical::Zero {
             // check if they are close enough to the center coordinate of a cell (only allow turning down a corridor if we are close enough to it)
-            let rounded_pos = current_pos.round();
+            //let rounded_pos = current_pos.round();
             // don't let the turn happen if we are too far away from the center position -- ASSUMPTION: ALL CORRIDOORS ARE ONLY 1 BLOCK WIDE
 
-            let mut min_x = -TURNING_THRESHOLD;
-            let mut max_x = TURNING_THRESHOLD;
-            let diff = current_pos.x - rounded_pos.x;
-
-            if player.direction_of_travel.horizontal == -1.0 {
-                min_x = 0.0;
-            } else if player.direction_of_travel.horizontal == 1.0 {
-                max_x = 0.0;
-            }
-
-            skip_get_pos = diff < min_x || diff > max_x;
+            skip_get_pos = at_decision_point(current_pos, player.direction_of_travel, game_logic);
             potential_pos.1 = skip_get_pos;
-
-            //info!("Pressed vertical, was going horizontal  Skip:{:?}  Diff:{:?}  MinX:{:?}  MaxX:{:?}", skip_get_pos, diff, min_x, max_x);
         }
 
         // if no collision detected yet, get the new position
@@ -232,30 +237,19 @@ fn player_movement(
     }
     
     // now check the horizontal direction if the vertical was not fruitful
-    if potential_pos.1 && pressed_direction.horizontal != 0.0 && pressed_direction.horizontal != player.direction_of_travel.horizontal {
+    if potential_pos.1 && pressed_direction.horizontal != Horizontal::Zero && pressed_direction.horizontal != player.direction_of_travel.horizontal {
     
-        let horizontal_direction = Direction{vertical: 0.0, horizontal: pressed_direction.horizontal};
+        let horizontal_direction = Direction{vertical: Vertical::Zero, horizontal: pressed_direction.horizontal};
         
         let mut skip_get_pos = false;
 
         // if the player was not already going horizontal (they are turning from a vertical direction of travel to turn a 90 degree corner)
-        if player.direction_of_travel.horizontal == 0.0 {
+        if player.direction_of_travel.horizontal == Horizontal::Zero {
             // check if they are close enough to the center coordinate of a cell (only allow turning down a corridor if we are close enough to it)
-            let rounded_pos = current_pos.round();
+            //let rounded_pos = current_pos.round();
             // don't let the turn happen if we are too far away from the center position -- ASSUMPTION: ALL CORRIDOORS ARE ONLY 1 BLOCK WIDE
 
-            let mut min_y = -TURNING_THRESHOLD;
-            let mut max_y = TURNING_THRESHOLD;
-            let diff = current_pos.y - rounded_pos.y;
-
-            // up is -1 down is +1 (opposite to the game board coords)
-            if player.direction_of_travel.vertical == -1.0 {
-                min_y = 0.0;
-            } else if player.direction_of_travel.vertical == 1.0 {
-                max_y = 0.0;
-            }
-
-            skip_get_pos = diff < min_y || diff > max_y;
+            skip_get_pos = at_decision_point(current_pos, player.direction_of_travel, game_logic);
             potential_pos.1 = skip_get_pos;
         }
 
@@ -284,8 +278,8 @@ fn player_movement(
 
     if potential_pos.1 {
         // we cannot move anymore - stop moving now!
-        player.direction_of_travel.horizontal = 0.0;
-        player.direction_of_travel.vertical = 0.0;
+        player.direction_of_travel.horizontal = Horizontal::Zero;
+        player.direction_of_travel.vertical = Vertical::Zero;
         
         // snap to the block position so that we are directly on the path
         let snapped_grid_pos = Vec2 {x: current_pos.x.round(), y: current_pos.y.round()};
@@ -310,17 +304,17 @@ fn player_movement(
 
         // 0 - ((direction horizontal x 90 degrees) - 90)
         // 360 - (direction vertical x 90 degrees) + 180
-        if player.direction_of_travel.horizontal != 0.0 || player.direction_of_travel.vertical != 0.0 {
+        if player.direction_of_travel.horizontal != Horizontal::Zero || player.direction_of_travel.vertical != Vertical::Zero {
 
             let rotation_h = 
-                if player.direction_of_travel.horizontal != 0.0 {
-                    0.0 - ((player.direction_of_travel.horizontal * 90.0) - 90.0)
+                if player.direction_of_travel.horizontal != Horizontal::Zero {
+                    0.0 - ((player.direction_of_travel.horizontal as i32 as f32 * 90.0) - 90.0)
                 } else {
                     0.0
                 };
             let rotation_v = 
-                if player.direction_of_travel.vertical != 0.0 {
-                    (player.direction_of_travel.vertical * 90.0) + 180.0
+                if player.direction_of_travel.vertical != Vertical::Zero {
+                    (player.direction_of_travel.vertical as i32 as f32 * 90.0) + 180.0
                 } else {
                     0.0
                 };
@@ -409,77 +403,6 @@ fn count_point_tokens_left(game_logic: GameLogic) -> u32 {
 }
 
 /*
- * Get a new position going the given distance in the given direction starting from the current_pos
- * All coordinates are in gamelogic coordinates (not screen coords)
- */
-pub fn get_new_position(game_logic: &GameLogic, current_pos: Vec2, direction: Direction, distance: f32) -> (Vec2, bool) {
-    let next_snapped_pos = 
-        Vec2 {x: current_pos.x.round(), y: current_pos.y.round()};
-
-    let mut valid_pos = current_pos;
-    
-    // if the snapped position is close enough to the current position
-    if (next_snapped_pos.x - current_pos.x).abs() < distance {valid_pos.x = next_snapped_pos.x;}
-    if (next_snapped_pos.y - current_pos.y).abs() < distance {valid_pos.y = next_snapped_pos.y;}
-
-
-    let mut new_pos = valid_pos;
-    new_pos.x += direction.horizontal * distance;
-    new_pos.y += direction.vertical * distance;
-
-    let block_size = Vec2 {x: 0.99, y: 0.99};
-
-    let collision_rect = Rect::from_center_size(new_pos, block_size);
-
-    // check if the position is valid
-    // go through all 9 of the surrounding tiles, for any that are walls, check if the position is valid
-    let index_x = new_pos.x.round() as i32;
-    let index_y = new_pos.y.round() as i32;
-
-    let mut col = index_x - 1;
-    let mut row = index_y - 1;
-
-    let mut valid = true;
-
-    'outer: while row <= index_y + 1 {
-        while col <= index_x + 1 {
-
-            let mut is_wall = false;
-
-            // check if the current row and col are valid
-            if row < 0 || col < 0 || 
-                row >= BOARD_HEIGHT as i32 ||
-                col >= BOARD_WIDTH as i32 {
-                // it is a wall
-                is_wall = true;
-            } else {
-                match game_logic.game_blocks[row as usize][col as usize].block_type {
-                    BlockType::Wall => { is_wall = true; },
-                    _ => ()
-                }
-            }
-
-            if is_wall {
-                // check collision with the new_pos
-                if check_collision(collision_rect, Rect::from_center_size(Vec2{x: col as f32, y: row as f32}, collision_rect.size())) {
-                    //info!("Hit wall {:?},{:?}", col, row);
-                    new_pos = current_pos;
-                    valid = false;
-                    break 'outer;
-                }
-            }
-
-            col += 1;
-        }
-        col = index_x - 1;
-        row += 1;
-    }
-
-
-    (new_pos, valid)
-}
-
-/*
  * Does a basic check of the collision of 2 rectangles
  * - Can fail to detect a collision if object2 is smaller than object1
  * Returns true if collision
@@ -508,8 +431,8 @@ fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Di
     let mut return_val = (current_pos, false);
     
     let mut new_pos = current_pos;
-    new_pos.x += direction.horizontal * distance;
-    new_pos.y += direction.vertical * distance;
+    new_pos.x += direction.horizontal as i32 as f32 * distance;
+    new_pos.y += direction.vertical as i32 as f32 * distance;
     let collision_rect = Rect::from_center_size(new_pos, Vec2 {x: 1.0, y: 1.0});
 
     let mut check_for_collision = false;
@@ -517,8 +440,8 @@ fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Di
     // get the cell coords of the cell that we are aiming for
     let mut cell_to_check = new_pos.round();
 
-    cell_to_check.x += direction.horizontal;
-    cell_to_check.y += direction.vertical;
+    cell_to_check.x += direction.horizontal as i32 as f32;
+    cell_to_check.y += direction.vertical as i32 as f32;
 
     // verify if cell to check is out of bounds
     if cell_to_check.x >= 0.0 && cell_to_check.x < (BOARD_WIDTH as f32) &&
@@ -549,9 +472,9 @@ fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Di
         // a collision occurred
         if return_val.1 {
             // set position to the nearest whole numbers in that direction
-            if direction.horizontal != 0.0 {
+            if direction.horizontal != Horizontal::Zero {
                 return_val.0.x = return_val.0.x.round();
-            } else if direction.vertical != 0.0 {
+            } else if direction.vertical != Vertical::Zero {
                 return_val.0.y = return_val.0.y.round();
             }
         }
@@ -564,3 +487,33 @@ fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Di
 
     return_val
 }
+
+/** Is the entity at a position on the block it is on where it could potentially decide to change direction (down a side passage for example)?
+ * This function doesnt do any actual checking if there are any side passages to go down - for that use get_available_directions
+ * Returns true if the given position is in a potential position to change direction
+ */
+fn at_decision_point(position: Vec2, direction: Direction, gamelogic: &GameLogic) -> bool {
+
+    // extract the position in the axis that we are working with
+    let current_pos = if direction.horizontal == Horizontal::Zero { position.y } else { position.x };
+
+    const TURNING_THRESHOLD : f32 = 0.2;
+
+    let mut min_diff = -TURNING_THRESHOLD;
+    let mut max_diff = TURNING_THRESHOLD;
+    let diff = current_pos - current_pos.round();
+
+    if direction.vertical == Vertical::Up || direction.horizontal == Horizontal::Left {
+        min_diff = 0.0;
+    } else if direction.vertical == Vertical::Down || direction.horizontal == Horizontal::Right {
+        max_diff = 0.0;
+    }
+
+    return diff < min_diff || diff > max_diff;
+}
+
+/* Get the available directions from the current position on the gameboard
+ */
+/*fn get_available_directions(position: Vec2, gamelogic: &GameLogic) -> Vec {
+
+}*/
