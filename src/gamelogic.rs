@@ -216,7 +216,7 @@ fn player_movement(
             //let rounded_pos = current_pos.round();
             // don't let the turn happen if we are too far away from the center position -- ASSUMPTION: ALL CORRIDOORS ARE ONLY 1 BLOCK WIDE
 
-            skip_get_pos = at_decision_point(current_pos, player.direction_of_travel, game_logic);
+            skip_get_pos = !at_decision_point(current_pos, player.direction_of_travel, game_logic);
             potential_pos.1 = skip_get_pos;
         }
 
@@ -249,7 +249,7 @@ fn player_movement(
             //let rounded_pos = current_pos.round();
             // don't let the turn happen if we are too far away from the center position -- ASSUMPTION: ALL CORRIDOORS ARE ONLY 1 BLOCK WIDE
 
-            skip_get_pos = at_decision_point(current_pos, player.direction_of_travel, game_logic);
+            skip_get_pos = !at_decision_point(current_pos, player.direction_of_travel, game_logic);
             potential_pos.1 = skip_get_pos;
         }
 
@@ -426,7 +426,7 @@ pub fn check_collision(object1: Rect, object2: Rect) -> bool {
  * Attempt to get a new position given a current position, a direction and a distance
  * Returns the new postion and if there was a collision
  */
-fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Direction, distance: f32) -> (Vec2, bool) {
+pub fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Direction, distance: f32) -> (Vec2, bool) {
 
     let mut return_val = (current_pos, false);
     
@@ -492,7 +492,7 @@ fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction: Di
  * This function doesnt do any actual checking if there are any side passages to go down - for that use get_available_directions
  * Returns true if the given position is in a potential position to change direction
  */
-fn at_decision_point(position: Vec2, direction: Direction, gamelogic: &GameLogic) -> bool {
+pub fn at_decision_point(position: Vec2, direction: Direction, gamelogic: &GameLogic) -> bool {
 
     // extract the position in the axis that we are working with
     let current_pos = if direction.horizontal == Horizontal::Zero { position.y } else { position.x };
@@ -509,11 +509,59 @@ fn at_decision_point(position: Vec2, direction: Direction, gamelogic: &GameLogic
         max_diff = 0.0;
     }
 
-    return diff < min_diff || diff > max_diff;
+    return diff >= min_diff && diff < max_diff;
 }
 
 /* Get the available directions from the current position on the gameboard
+ * A direction that is the opposite of the given direction is ignored
  */
-/*fn get_available_directions(position: Vec2, gamelogic: &GameLogic) -> Vec {
+pub fn get_available_directions(position: Vec2, direction: Direction, gamelogic: &GameLogic) -> Vec<Direction> {
+    let mut avail_dirs: Vec<Direction> = Vec::new();
 
-}*/
+    let block_pos = position.round();
+
+    // check if block position is a valid gameboard position
+    if block_pos.x >= 0.0 && block_pos.x < BOARD_WIDTH as f32 &&
+       block_pos.y >= 0.0 && block_pos.y < BOARD_HEIGHT as f32
+    {
+        // check left, right up and down directions
+        let directions: [Direction; 4] = 
+            [Direction {vertical: Vertical::Zero, horizontal: Horizontal::Left},
+             Direction {vertical: Vertical::Zero, horizontal: Horizontal::Right},
+             Direction {vertical: Vertical::Up, horizontal: Horizontal::Zero},
+             Direction {vertical: Vertical::Down, horizontal: Horizontal::Zero}];
+
+        // calculate the opposite direction
+        let mut opposite_direction = direction;
+        opposite_direction.horizontal = 
+            if direction.horizontal == Horizontal::Left { Horizontal::Right }
+            else if direction.horizontal == Horizontal::Right { Horizontal::Left }
+            else { Horizontal::Zero };
+        
+        opposite_direction.vertical = 
+            if direction.vertical == Vertical::Up { Vertical::Down }
+            else if direction.vertical == Vertical::Down { Vertical::Up }
+            else { Vertical::Zero };
+
+        for check_dir in &directions {
+
+            // ignore any direction that is the same as the opposite of the given direction
+            if check_dir.horizontal != opposite_direction.horizontal || check_dir.vertical != opposite_direction.vertical {
+
+                let check_pos = Vec2 {x: block_pos.x + check_dir.horizontal as i32 as f32, y: block_pos.y + check_dir.vertical as i32 as f32};
+
+                // check if check_pos is a valid gameboard position
+                if check_pos.x >= 0.0 && check_pos.x < BOARD_WIDTH as f32 &&
+                check_pos.y >= 0.0 && check_pos.y < BOARD_HEIGHT as f32
+                {
+                    match gamelogic.game_blocks[check_pos.x as usize][check_pos.y as usize].block_type {
+                        BlockType::Wall => {}, // do nothing for walls
+                        _ => { avail_dirs.push(check_dir.clone()) } // for everything else add this direction to list of available directions
+                    }
+                }
+            }
+        }
+    }
+
+    return avail_dirs;
+}

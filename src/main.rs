@@ -1,8 +1,4 @@
-use std::thread::current;
-
-// use bevy::core_pipeline::clear_color::ClearColorConfig;
-use bevy::{ecs::schedule::MultiThreadedExecutor, prelude::*};
-//use bevy::input::common_conditions::input_toggle_active;/
+use bevy::prelude::*;
 //use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
 use ui::GameUI;

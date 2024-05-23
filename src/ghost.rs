@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 
-use crate::gamelogic::{GameLogic, Horizontal, Vertical};
+use rand::prelude::*;
+
+use crate::gamelogic::{at_decision_point, get_available_directions, get_new_position_alt, GameLogic, Horizontal, Vertical};
 use crate::{AnimationIndicies, AnimationTimer};
-use crate::{gamelogic, Player, Score};
+use crate::gamelogic;
 use gamelogic::Direction;
 use gamelogic::get_screen_coords;
 use gamelogic::get_game_board_coords;
@@ -17,7 +19,7 @@ impl Plugin for GhostPlugin {
     }
 }
 
-enum GhostStatus {
+pub enum GhostStatus {
     InPen,
     LeavingPen,
     SearchingForPlayer,
@@ -36,6 +38,8 @@ pub struct Ghost {
 
     pub status: GhostStatus,
     pub time_in_pen: Timer,
+
+    pub name: String,
 }
 
 #[derive(Component)]
@@ -53,16 +57,17 @@ fn spawn_ghosts(
 
     // ghost details holds the individual data for each of the ghosts
     struct GhostDetails {
+        name: String,
         transform: Transform,
         colour: Color,
         time_in_pen: f32,
     }
 
     let ghost_details: [GhostDetails; 4] = [
-        GhostDetails { transform: Transform::from_xyz(-20.0, 20.0, 0.01), colour: Color::Rgba {red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0}, time_in_pen: 5.0 },
-        GhostDetails { transform: Transform::from_xyz(0.0, 20.0, 0.01),   colour: Color::Rgba {red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0}, time_in_pen: 10.0 },
-        GhostDetails { transform: Transform::from_xyz(20.0, 20.0, 0.01),  colour: Color::Rgba {red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0}, time_in_pen: 15.0 },
-        GhostDetails { transform: Transform::from_xyz(40.0, 20.0, 0.01),  colour: Color::Rgba {red: 1.0, green: 1.0, blue: 0.0, alpha: 1.0}, time_in_pen: 20.0 }
+        GhostDetails { name: String::from("Red"),    transform: Transform::from_xyz(-20.0, 5.0, 0.011), colour: Color::Rgba {red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0}, time_in_pen: 5.0 },
+        GhostDetails { name: String::from("Cyan"),   transform: Transform::from_xyz(0.0, 5.0, 0.011),   colour: Color::Rgba {red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0}, time_in_pen: 10.0 },
+        GhostDetails { name: String::from("Pink"),   transform: Transform::from_xyz(20.0, 5.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0}, time_in_pen: 15.0 },
+        GhostDetails { name: String::from("Yellow"), transform: Transform::from_xyz(40.0, 5.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 1.0, blue: 0.0, alpha: 1.0}, time_in_pen: 20.0 }
     ];
 
     for ghost_detail in ghost_details {
@@ -79,8 +84,9 @@ fn spawn_ghosts(
 
 
         let ghost = Ghost {
+            name: ghost_detail.name,
             direction_of_travel: Direction {vertical: Vertical::Zero, horizontal: Horizontal::Left},
-            speed: 1.0,
+            speed: 2.0,
             body_entity: commands.spawn((
                 SpriteSheetBundle {
                     texture_atlas: texture_atlases.add(TextureAtlas::from_grid(
@@ -131,6 +137,7 @@ fn move_ghost(
     mut ghosts: Query<&mut Ghost>,
     mut ghost_eyes_transforms: Query<(&mut Transform, &AnimationIndicies, &mut TextureAtlasSprite), (With<GhostEyes>, Without<GhostBody>)>,
     mut ghost_body_transforms: Query<&mut Transform, (With<GhostBody>, Without<GhostEyes>)>,
+    game_logic: Query<&GameLogic>,
     time: Res<Time>,
 ) {
     for mut ghost in &mut ghosts {
@@ -182,6 +189,19 @@ fn move_ghost(
                             new_pos.y = PEN_EXIT.y;
                             // we are out of the pen
                             ghost.status = GhostStatus::SearchingForPlayer;
+                            
+                            ghost.direction_of_travel.vertical = Vertical::Zero;
+                            /*ghost.direction_of_travel.horizontal = if random() {
+                                Horizontal::Left
+                            } else {
+                                Horizontal::Right
+                            };*/
+
+                            if random() { 
+                                ghost.direction_of_travel.horizontal = Horizontal::Left;
+                            } else {
+                                ghost.direction_of_travel.horizontal = Horizontal::Right;
+                            }
                         }
                     } else {
                         // move towards pen exit x position
@@ -204,7 +224,30 @@ fn move_ghost(
 
                     // check if we are at an intersection to make a decision
                     // otherwise just continue in the direction we were going before (no need to change anything)
+
+                    let game_logic = game_logic.single();
+
+                    if at_decision_point(new_pos, ghost.direction_of_travel, game_logic) {
+                        let available_directions = get_available_directions(new_pos, ghost.direction_of_travel, game_logic);
+
+                        info!("{:?} at decision point! {new_pos}, {:?} directions available", ghost.name, available_directions.len());
+                        // make sure there are directions in the list
+                        if available_directions.len() > 0 {
+                            
+                            let mut decision = 0;
+                            if available_directions.len() > 1 {
+                                decision = thread_rng().gen_range(0..available_directions.len());
+                            }
+
+                            // change direction to the one in the decision
+                            ghost.direction_of_travel = available_directions[decision];
+                        }
+                    }
                     
+                    // try to move in the current direction of travel
+                    new_pos = get_new_position_alt(game_logic, new_pos, ghost.direction_of_travel, movement).0;
+
+
                 },
                 GhostStatus::RunningToPen => {}
             }
