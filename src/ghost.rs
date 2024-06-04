@@ -232,7 +232,7 @@ fn move_ghost(
 
                         info!("{:?} at decision point! {new_pos}, {:?} directions available", ghost.name, available_directions.len());
                         // make sure there are directions in the list
-                        if available_directions.len() > 0 {
+                        if available_directions.is_empty() == false {
                             
                             let mut decision = 0;
                             if available_directions.len() > 1 {
