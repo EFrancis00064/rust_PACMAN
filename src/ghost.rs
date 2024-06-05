@@ -64,29 +64,28 @@ fn spawn_ghosts(
     }
 
     let ghost_details: [GhostDetails; 4] = [
-        GhostDetails { name: String::from("Red"),    transform: Transform::from_xyz(-20.0, 5.0, 0.011), colour: Color::Rgba {red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0}, time_in_pen: 5.0 },
-        GhostDetails { name: String::from("Cyan"),   transform: Transform::from_xyz(0.0, 5.0, 0.011),   colour: Color::Rgba {red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0}, time_in_pen: 10.0 },
-        GhostDetails { name: String::from("Pink"),   transform: Transform::from_xyz(20.0, 5.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0}, time_in_pen: 15.0 },
-        GhostDetails { name: String::from("Yellow"), transform: Transform::from_xyz(40.0, 5.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 1.0, blue: 0.0, alpha: 1.0}, time_in_pen: 20.0 }
+        GhostDetails { name: String::from("Red"),    transform: Transform::from_xyz(-20.0, 5.0, 0.011), colour: Color::Rgba {red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0}, time_in_pen: 1.0 },
+        GhostDetails { name: String::from("Cyan"),   transform: Transform::from_xyz(0.0, 5.0, 0.011),   colour: Color::Rgba {red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0}, time_in_pen: 5.0 },
+        GhostDetails { name: String::from("Pink"),   transform: Transform::from_xyz(20.0, 5.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0}, time_in_pen: 9.0 },
+        GhostDetails { name: String::from("Yellow"), transform: Transform::from_xyz(40.0, 5.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 1.0, blue: 0.0, alpha: 1.0}, time_in_pen: 13.0 }
     ];
 
     for ghost_detail in ghost_details {
 
-        let ghost_size = Vec2::new(21.0, 21.0);
+        let ghost_size = Vec2::new(21.0, 23.0);
         let ghost_anim_indicies = AnimationIndicies {first: 0, last: 4};
 
         let mut ghost_sprite = TextureAtlasSprite::new(ghost_anim_indicies.first);
-        ghost_sprite.custom_size = Some(Vec2::new(21.0, 20.0));
+        //ghost_sprite.custom_size = Some(Vec2::new(21.0, 23.0));
         ghost_sprite.color = ghost_detail.colour;
 
         let eyes_indicies = AnimationIndicies {first: 0, last: 4};
-        //let eyes_pos = Transform::from_xyz(0.0, 20.0, 0.0105);
 
 
         let ghost = Ghost {
             name: ghost_detail.name,
             direction_of_travel: Direction {vertical: Vertical::Zero, horizontal: Horizontal::Left},
-            speed: 2.0,
+            speed: 4.0,
             body_entity: commands.spawn((
                 SpriteSheetBundle {
                     texture_atlas: texture_atlases.add(TextureAtlas::from_grid(

@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, ui::update};
 //use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
 use ui::GameUI;
@@ -14,7 +14,7 @@ mod gamelogic;
 pub struct Score(pub i32);
 
 #[derive(Resource)]
-pub struct CurrentColour(Color);
+pub struct CurrentColour(f32);
 
 #[derive(Component)]
 struct AnimationIndicies {
@@ -48,7 +48,7 @@ fn main() {
         //)
         .add_plugins((GhostPlugin, GameUI, GameLogicPlugin))
         .insert_resource(Score(0))
-        .insert_resource(CurrentColour(Color::rgb(0.0, 0.0, 1.0)))
+        .insert_resource(CurrentColour(0.0))
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
         .add_systems(Update, update_multi_colours)
@@ -119,7 +119,7 @@ fn setup(
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(0.0, -10.0, 0.011),
+                translation: Vec3::new(0.0, -10.0, 0.05),
                 ..default()
             },
             texture: asset_server.load("warp_tunnels.png"),
@@ -152,59 +152,48 @@ fn animate_sprite(
 fn update_multi_colours (
     time: Res<Time>,
     mut query: Query<&mut Sprite, With<MultiColoured>>,
-    mut current_colour: ResMut<CurrentColour>,
+    mut current_colour_index: ResMut<CurrentColour>,
 ) {
 
     let update_amount = time.delta_seconds() / 2.0;
 
-    let mut r = current_colour.0.r();
-    let mut g = current_colour.0.g();
-    let mut b = current_colour.0.b();
+    let mut r = 0.0;
+    let mut g = 0.0;
+    let mut b = 0.0;
 
-    if (b * 255.0).round() == 0.0 && (g * 255.0).round() < 255.0 {
-        r -= update_amount;
-        if r < 0.0 {
-            r = 0.0;
-        }
-        
-        g += update_amount;
-        if g > 1.0 {
-            g = 1.0;
-        }
+    // current_colour_index goes from 0 to 3:
+    // 0    -    1    -    2    -    3 
+    //  r--, g++ |g--, b++ | b--, r++  
 
-        current_colour.0.set_r(r);
-        current_colour.0.set_g(g);
+    // change the tuple into the actual value we are looking for
+    //let mut current_colour_index = current_colour_index.0;
 
-    } else if (r * 255.0).round() == 0.0 && (b * 255.0).round() < 255.0 {
-        g -= update_amount;
-        if g < 0.0 {
-            g = 0.0;
-        }
-
-        b += update_amount;
-        if b > 1.0 {
-            b = 1.0;
-        }
-
-        current_colour.0.set_g(g);
-        current_colour.0.set_b(b);
-
-    } else if (g * 255.0).round() == 0.0 && (r * 255.0).round() < 255.0 {
-        b -= update_amount;
-        if b < 0.0 {
-            b = 0.0;
-        }
-
-        r += update_amount;
-        if r > 1.0 {
-            r = 1.0;
-        }
-
-        current_colour.0.set_b(b);
-        current_colour.0.set_r(r);
+    current_colour_index.0 += update_amount;
+    if current_colour_index.0 >= 3.0 {
+        current_colour_index.0 = 0.0;
     }
-    
+
+    let decimal = current_colour_index.0 - current_colour_index.0.floor();
+
+    if current_colour_index.0 >= 0.0 && current_colour_index.0 < 1.0 {
+        // r--, g++
+        r = 1.0 - decimal;
+        g = decimal;
+    } else if current_colour_index.0 >= 1.0 && current_colour_index.0 < 2.0 {
+        // g--, b++
+        g = 1.0 - decimal;
+        b = decimal;
+    } else if current_colour_index.0 >= 2.0 && current_colour_index.0 < 3.0 {
+        // b--, r++
+        b = 1.0 - decimal;
+        r = decimal;
+    }
+
+    let sprite_colour = Color::rgb(r, g, b);
+
+    //info!("Updating current colour: {:?} {:?}", current_colour_index.0, sprite_colour);
+
     for mut sprite in &mut query {
-        sprite.color = current_colour.0;
+        sprite.color = sprite_colour;
     }
 }
