@@ -230,7 +230,12 @@ fn move_ghost(
                     if at_decision_point(new_pos, ghost.direction_of_travel, game_logic) {
                         let available_directions = get_available_directions(new_pos, ghost.direction_of_travel, game_logic);
 
-                        info!("{:?} at decision point! {new_pos}, {:?} directions available", ghost.name, available_directions.len());
+                        if ghost.name.contains("Red") {
+                            //info!("{:?} at decision point! {new_pos}, {:?} directions available, {:?}", ghost.name, available_directions.len(), available_directions);
+                            //for d in &available_directions {
+                            //    info!("{:?} {:?}", d.vertical as i32, d.horizontal as i32);
+                            //}
+                        }
                         // make sure there are directions in the list
                         if available_directions.is_empty() == false {
                             
@@ -240,7 +245,23 @@ fn move_ghost(
                             }
 
                             // change direction to the one in the decision
+                            let has_changed = available_directions[decision].vertical != ghost.direction_of_travel.vertical ||
+                                                    available_directions[decision].horizontal != ghost.direction_of_travel.horizontal;
+
                             ghost.direction_of_travel = available_directions[decision];
+
+                            if has_changed {
+                                if let Horizontal::Zero = ghost.direction_of_travel.horizontal {
+                                    // we are now moving vertically
+                                    // snap our position to the rounded x value
+                                    new_pos.x = new_pos.x.round();
+                                } else if let Vertical::Zero = ghost.direction_of_travel.vertical {
+                                    // we are now moving horizontally
+                                    // snap our position to the rounded y value
+                                    new_pos.y = new_pos.y.round();
+                                }
+                            }
+                            
                         }
                     }
                     

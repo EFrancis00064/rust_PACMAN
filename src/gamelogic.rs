@@ -1,3 +1,5 @@
+use core::fmt;
+
 use bevy::prelude::*;
 
 use crate::Score;
@@ -24,13 +26,13 @@ pub struct BlockCell {
     block_reward: BlockReward,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum Vertical {Up = -1, Down = 1, Zero = 0}
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum Horizontal {Left = -1, Right = 1, Zero = 0}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Direction {
     pub vertical: Vertical,
     pub horizontal: Horizontal,
@@ -497,7 +499,7 @@ pub fn at_decision_point(position: Vec2, direction: Direction, gamelogic: &GameL
     // extract the position in the axis that we are working with
     let current_pos = if direction.horizontal == Horizontal::Zero { position.y } else { position.x };
 
-    const TURNING_THRESHOLD : f32 = 0.2;
+    const TURNING_THRESHOLD : f32 = 0.1;
 
     let mut min_diff = -TURNING_THRESHOLD;
     let mut max_diff = TURNING_THRESHOLD;
@@ -554,9 +556,11 @@ pub fn get_available_directions(position: Vec2, direction: Direction, gamelogic:
                 if check_pos.x >= 0.0 && check_pos.x < BOARD_WIDTH as f32 &&
                 check_pos.y >= 0.0 && check_pos.y < BOARD_HEIGHT as f32
                 {
-                    match gamelogic.game_blocks[check_pos.x as usize][check_pos.y as usize].block_type {
-                        BlockType::Wall => {}, // do nothing for walls
-                        _ => { avail_dirs.push(check_dir.clone()) } // for everything else add this direction to list of available directions
+                    if let BlockType::Wall = gamelogic.game_blocks[check_pos.y as usize][check_pos.x as usize].block_type {
+                        // do nothing for wall
+                    }
+                    else {
+                        avail_dirs.push(check_dir.clone());
                     }
                 }
             }
