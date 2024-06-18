@@ -21,7 +21,6 @@ enum BlockReward {
 
 #[derive(Clone, Copy)]
 pub struct BlockCell {
-    exit_path_count: u8,
     block_type: BlockType,
     block_reward: BlockReward,
 }
@@ -75,11 +74,11 @@ fn setup_gameboard(mut commands: Commands) {
         //game_blocks: [[BlockCell::default(); BOARD_HEIGHT]; BOARD_WIDTH], //[[BlockCell {exit_path_count: 0, block_type: BlockType::Wall, block_reward:BlockReward::Nothing}; 20]; 24];
 
         game_blocks: {
-            const W: BlockCell = BlockCell {exit_path_count: 0, block_type: BlockType::Wall, block_reward: BlockReward::Nothing};
-            const P: BlockCell = BlockCell {exit_path_count: 2, block_type: BlockType::Path, block_reward: BlockReward::PointToken};
-            const Q: BlockCell = BlockCell {exit_path_count: 2, block_type: BlockType::Path, block_reward: BlockReward::Nothing}; // a path but with no point token
-            const X: BlockCell = BlockCell {exit_path_count: 2, block_type: BlockType::Warp(25,13), block_reward: BlockReward::Nothing}; // X warps to Y
-            const Y: BlockCell = BlockCell {exit_path_count: 2, block_type: BlockType::Warp(0, 13), block_reward: BlockReward::Nothing}; // Y warps to X
+            const W: BlockCell = BlockCell {block_type: BlockType::Wall, block_reward: BlockReward::Nothing};
+            const P: BlockCell = BlockCell {block_type: BlockType::Path, block_reward: BlockReward::PointToken};
+            const Q: BlockCell = BlockCell {block_type: BlockType::Path, block_reward: BlockReward::Nothing}; // a path but with no point token
+            const X: BlockCell = BlockCell {block_type: BlockType::Warp(25,13), block_reward: BlockReward::Nothing}; // X warps to Y
+            const Y: BlockCell = BlockCell {block_type: BlockType::Warp(0, 13), block_reward: BlockReward::Nothing}; // Y warps to X
 
            [[P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P], // r0
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r1

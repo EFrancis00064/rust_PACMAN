@@ -1,8 +1,9 @@
+use bevy::ecs::schedule::OrElse;
 use bevy::prelude::*;
 
 use rand::prelude::*;
 
-use crate::gamelogic::{at_decision_point, get_available_directions, get_new_position_alt, GameLogic, Horizontal, Vertical};
+use crate::gamelogic::{at_decision_point, get_available_directions, get_new_position_alt, GameLogic, Horizontal, Player, Vertical};
 use crate::{AnimationIndicies, AnimationTimer};
 use crate::gamelogic;
 use gamelogic::Direction;
@@ -65,9 +66,9 @@ fn spawn_ghosts(
 
     let ghost_details: [GhostDetails; 4] = [
         GhostDetails { name: String::from("Red"),    transform: Transform::from_xyz(-20.0, 5.0, 0.011), colour: Color::Rgba {red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0}, time_in_pen: 1.0 },
-        GhostDetails { name: String::from("Cyan"),   transform: Transform::from_xyz(0.0, 5.0, 0.011),   colour: Color::Rgba {red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0}, time_in_pen: 5.0 },
-        GhostDetails { name: String::from("Pink"),   transform: Transform::from_xyz(20.0, 5.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0}, time_in_pen: 9.0 },
-        GhostDetails { name: String::from("Yellow"), transform: Transform::from_xyz(40.0, 5.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 1.0, blue: 0.0, alpha: 1.0}, time_in_pen: 13.0 }
+        GhostDetails { name: String::from("Cyan"),   transform: Transform::from_xyz(0.0, 10.0, 0.011),   colour: Color::Rgba {red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0}, time_in_pen: 5.0 },
+        GhostDetails { name: String::from("Pink"),   transform: Transform::from_xyz(20.0, 0.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0}, time_in_pen: 9.0 },
+        GhostDetails { name: String::from("Yellow"), transform: Transform::from_xyz(40.0, 15.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 1.0, blue: 0.0, alpha: 1.0}, time_in_pen: 13.0 }
     ];
 
     for ghost_detail in ghost_details {
@@ -76,7 +77,6 @@ fn spawn_ghosts(
         let ghost_anim_indicies = AnimationIndicies {first: 0, last: 4};
 
         let mut ghost_sprite = TextureAtlasSprite::new(ghost_anim_indicies.first);
-        //ghost_sprite.custom_size = Some(Vec2::new(21.0, 23.0));
         ghost_sprite.color = ghost_detail.colour;
 
         let eyes_indicies = AnimationIndicies {first: 0, last: 4};
@@ -129,6 +129,16 @@ fn spawn_ghosts(
         commands.spawn(ghost);
 
     }
+
+    // test suite for ghost functions
+    /*let mut direction_test: Vec<Direction> = Vec::new();
+    direction_test.push(Direction {vertical: Vertical::Up, horizontal: Horizontal::Zero});
+    direction_test.push(Direction {vertical: Vertical::Down, horizontal: Horizontal::Zero});
+    direction_test.push(Direction {vertical: Vertical::Zero, horizontal: Horizontal::Left});
+    direction_test.push(Direction {vertical: Vertical::Zero, horizontal: Horizontal::Right});
+     
+    assert_eq!((false, 0), find_direction_match(&direction_test, &Direction {vertical: Vertical::Up, horizontal: Horizontal::Zero}));
+    assert_eq!((false, 3), find_direction_match(&direction_test, &Direction {vertical: Vertical::Zero, horizontal: Horizontal::Right}));*/
 }
 
 
@@ -136,15 +146,18 @@ fn move_ghost(
     mut ghosts: Query<&mut Ghost>,
     mut ghost_eyes_transforms: Query<(&mut Transform, &AnimationIndicies, &mut TextureAtlasSprite), (With<GhostEyes>, Without<GhostBody>)>,
     mut ghost_body_transforms: Query<&mut Transform, (With<GhostBody>, Without<GhostEyes>)>,
+    player_transform: Query<&Transform, (With<Player>, Without<GhostBody>, Without<GhostEyes>)>,
     game_logic: Query<&GameLogic>,
     time: Res<Time>,
 ) {
+    let player_transform = player_transform.single();
+
     for mut ghost in &mut ghosts {
         if let Ok((mut eye_transform, indices, mut sprite)) = ghost_eyes_transforms.get_mut(ghost.eyes_entity) {
             
             let mut new_pos = get_game_board_coords(Vec2 {x: eye_transform.translation.x, y: eye_transform.translation.y} );
 
-            let pen_movement = 1.0 * time.delta_seconds();
+            let pen_movement = 2.0 * time.delta_seconds();
 
             const PEN_EXIT: Vec2 = Vec2 {x: 12.5, y:10.0};
 
@@ -190,12 +203,7 @@ fn move_ghost(
                             ghost.status = GhostStatus::SearchingForPlayer;
                             
                             ghost.direction_of_travel.vertical = Vertical::Zero;
-                            /*ghost.direction_of_travel.horizontal = if random() {
-                                Horizontal::Left
-                            } else {
-                                Horizontal::Right
-                            };*/
-
+                            
                             if random() { 
                                 ghost.direction_of_travel.horizontal = Horizontal::Left;
                             } else {
@@ -229,18 +237,77 @@ fn move_ghost(
                     if at_decision_point(new_pos, ghost.direction_of_travel, game_logic) {
                         let available_directions = get_available_directions(new_pos, ghost.direction_of_travel, game_logic);
 
-                        if ghost.name.contains("Red") {
-                            //info!("{:?} at decision point! {new_pos}, {:?} directions available, {:?}", ghost.name, available_directions.len(), available_directions);
-                            //for d in &available_directions {
-                            //    info!("{:?} {:?}", d.vertical as i32, d.horizontal as i32);
-                            //}
-                        }
                         // make sure there are directions in the list
                         if available_directions.is_empty() == false {
                             
                             let mut decision = 0;
-                            if available_directions.len() > 1 {
-                                decision = thread_rng().gen_range(0..available_directions.len());
+
+                            //if thread_rng().gen_bool(0.00001) { // 50% chance to do a random movement
+                            if false { // for testing
+                                
+                                if available_directions.len() > 1 {
+                                    decision = thread_rng().gen_range(0..available_directions.len());
+                                }
+                            } else {
+                                // go towards player
+                                // find max difference between vertical and horizontal and decide to go that direction
+                                //let mut preferred_direction = ghost.direction_of_travel;
+                                let mut preferred_horizontal =  Direction {horizontal: Horizontal::Zero, vertical: Vertical::Zero};
+                                let mut preferred_vertical = Direction {horizontal: Horizontal::Zero, vertical: Vertical::Zero};
+
+                                let player_game_pos = get_game_board_coords(Vec2 {x: player_transform.translation.x, y: player_transform.translation.y});
+                                let hor_diff = player_game_pos.x - new_pos.x;
+                                let ver_diff = player_game_pos.y - new_pos.y;
+                                
+                                
+                                // setup the horizontal direction
+                                preferred_horizontal.horizontal = if hor_diff >= 0.0 {
+                                    // player is to the right, go right
+                                    Horizontal::Right
+                                } else {
+                                    // player is to the left, go left
+                                    Horizontal::Left
+                                };
+
+                                // setup the vertical direction
+                                preferred_vertical.vertical = if ver_diff >= 0.0 {
+                                    // player is below, go down
+                                    Vertical::Down
+                                } else {
+                                    // player is above, go up
+                                    Vertical::Up
+                                };
+
+                                let (preferred_direction, second_preferred_direction) = if hor_diff.abs() > ver_diff.abs() {
+                                    // go in a horizontal direction
+                                    (preferred_horizontal, preferred_vertical)
+                                } else {
+                                    // go in a vertical direction
+                                    (preferred_vertical, preferred_horizontal)
+                                };
+
+                                let (mut direction_not_found, mut decision_index) = find_direction_match(&available_directions, &preferred_direction);
+                                if !direction_not_found {
+                                    decision = decision_index;
+                                } else {
+                                    (direction_not_found, decision_index) = find_direction_match(&available_directions, &second_preferred_direction);
+                                    if !direction_not_found {
+                                        decision = decision_index;
+                                    } else {
+                                        // neither choice is any good, choose at random
+                                        if available_directions.len() > 1 {
+                                            decision = thread_rng().gen_range(0..available_directions.len());
+                                        }
+                                    }
+                                }
+
+                                if available_directions.len() > 1 {
+                                    info!("Dir count: {:?}, Decision: {decision}, Preferred direction: {:?}, {:?}",
+                                        available_directions.len(),
+                                        preferred_direction,
+                                        second_preferred_direction
+                                    );
+                                }
                             }
 
                             // change direction to the one in the decision
@@ -301,3 +368,22 @@ fn move_ghost(
     }
 }
 
+fn find_direction_match(available_directions: &Vec<Direction>, search: &Direction) -> (bool, usize) {
+    let mut found_index = 0;
+
+    let mut decision_index = 0;
+
+    // now try to match the preferred direction with the available directions
+    for available_dir in available_directions {
+        // check for a match
+        if search.horizontal == available_dir.horizontal && search.vertical == available_dir.vertical {
+            // its a match - choose this direction
+            found_index = decision_index;
+            break;
+        }
+
+        decision_index += 1;
+    }
+    
+    (decision_index == available_directions.len(), found_index)
+}
