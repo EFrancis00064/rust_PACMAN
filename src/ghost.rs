@@ -41,6 +41,8 @@ pub struct Ghost {
     pub time_in_pen: Timer,
 
     pub name: String,
+
+    pub last_decision_point: Vec2,
 }
 
 #[derive(Component)]
@@ -59,16 +61,17 @@ fn spawn_ghosts(
     // ghost details holds the individual data for each of the ghosts
     struct GhostDetails {
         name: String,
+        speed: f32,
         transform: Transform,
         colour: Color,
         time_in_pen: f32,
     }
 
     let ghost_details: [GhostDetails; 4] = [
-        GhostDetails { name: String::from("Red"),    transform: Transform::from_xyz(-20.0, 5.0, 0.011), colour: Color::Rgba {red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0}, time_in_pen: 1.0 },
-        GhostDetails { name: String::from("Cyan"),   transform: Transform::from_xyz(0.0, 10.0, 0.011),   colour: Color::Rgba {red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0}, time_in_pen: 5.0 },
-        GhostDetails { name: String::from("Pink"),   transform: Transform::from_xyz(20.0, 0.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0}, time_in_pen: 9.0 },
-        GhostDetails { name: String::from("Yellow"), transform: Transform::from_xyz(40.0, 15.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 1.0, blue: 0.0, alpha: 1.0}, time_in_pen: 13.0 }
+        GhostDetails { name: String::from("Red"),    speed: 4.00, transform: Transform::from_xyz(-20.0, 5.0, 0.011), colour: Color::Rgba {red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0}, time_in_pen: 1.0 },
+        GhostDetails { name: String::from("Cyan"),   speed: 4.01, transform: Transform::from_xyz(0.0, 10.0, 0.011),   colour: Color::Rgba {red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0}, time_in_pen: 5.0 },
+        GhostDetails { name: String::from("Pink"),   speed: 3.99, transform: Transform::from_xyz(20.0, 0.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0}, time_in_pen: 9.0 },
+        GhostDetails { name: String::from("Yellow"), speed: 3.98, transform: Transform::from_xyz(40.0, 15.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 1.0, blue: 0.0, alpha: 1.0}, time_in_pen: 13.0 }
     ];
 
     for ghost_detail in ghost_details {
@@ -85,7 +88,7 @@ fn spawn_ghosts(
         let ghost = Ghost {
             name: ghost_detail.name,
             direction_of_travel: Direction {vertical: Vertical::Zero, horizontal: Horizontal::Left},
-            speed: 4.0,
+            speed: ghost_detail.speed,
             body_entity: commands.spawn((
                 SpriteSheetBundle {
                     texture_atlas: texture_atlases.add(TextureAtlas::from_grid(
@@ -124,6 +127,7 @@ fn spawn_ghosts(
 
             status: GhostStatus::InPen, // all ghosts start in the pen
             time_in_pen: Timer::from_seconds(ghost_detail.time_in_pen, TimerMode::Once),
+            last_decision_point: Vec2 {x: 0.0, y: 0.0},
         };
         
         commands.spawn(ghost);
@@ -151,6 +155,7 @@ fn move_ghost(
     time: Res<Time>,
 ) {
     let player_transform = player_transform.single();
+    let player_game_pos = get_game_board_coords(Vec2 {x: player_transform.translation.x, y: player_transform.translation.y});
 
     for mut ghost in &mut ghosts {
         if let Ok((mut eye_transform, indices, mut sprite)) = ghost_eyes_transforms.get_mut(ghost.eyes_entity) {
@@ -158,6 +163,9 @@ fn move_ghost(
             let mut new_pos = get_game_board_coords(Vec2 {x: eye_transform.translation.x, y: eye_transform.translation.y} );
 
             let pen_movement = 2.0 * time.delta_seconds();
+            
+            // distance calculated as pythagoras
+            let distance_from_player = ((player_game_pos.x - new_pos.x).abs().powi(2) + (player_game_pos.y - new_pos.y).abs().powi(2)).sqrt();
 
             const PEN_EXIT: Vec2 = Vec2 {x: 12.5, y:10.0};
 
@@ -234,7 +242,13 @@ fn move_ghost(
 
                     let game_logic = game_logic.single();
 
-                    if at_decision_point(new_pos, ghost.direction_of_travel, game_logic) {
+                    let rounded_new_pos = new_pos.round();
+                    
+                    // for each "decision point" only handle them once (each ghost will record which one it has handled most recently)
+                    if (rounded_new_pos.x as i32 != ghost.last_decision_point.x as i32 || 
+                        rounded_new_pos.y as i32 != ghost.last_decision_point.y as i32) &&
+                        at_decision_point(new_pos, ghost.direction_of_travel, game_logic) {
+
                         let available_directions = get_available_directions(new_pos, ghost.direction_of_travel, game_logic);
 
                         // make sure there are directions in the list
@@ -242,71 +256,20 @@ fn move_ghost(
                             
                             let mut decision = 0;
 
-                            //if thread_rng().gen_bool(0.00001) { // 50% chance to do a random movement
-                            if false { // for testing
+                            // if there is more than 1 available direction
+                            if available_directions.len() != 1 {
+
+                                // as distance from player gets bigger, chance to do random movements decreases until some threshold
+                                let chance_of_random_action = (distance_from_player / 30.0).min(0.9); // based on distance from player (or 0.9 if distance is too far)
                                 
-                                if available_directions.len() > 1 {
+                                if thread_rng().gen_bool(chance_of_random_action as f64) {
+                                    
+                                    // choose a random direction
                                     decision = thread_rng().gen_range(0..available_directions.len());
-                                }
-                            } else {
-                                // go towards player
-                                // find max difference between vertical and horizontal and decide to go that direction
-                                //let mut preferred_direction = ghost.direction_of_travel;
-                                let mut preferred_horizontal =  Direction {horizontal: Horizontal::Zero, vertical: Vertical::Zero};
-                                let mut preferred_vertical = Direction {horizontal: Horizontal::Zero, vertical: Vertical::Zero};
 
-                                let player_game_pos = get_game_board_coords(Vec2 {x: player_transform.translation.x, y: player_transform.translation.y});
-                                let hor_diff = player_game_pos.x - new_pos.x;
-                                let ver_diff = player_game_pos.y - new_pos.y;
-                                
-                                
-                                // setup the horizontal direction
-                                preferred_horizontal.horizontal = if hor_diff >= 0.0 {
-                                    // player is to the right, go right
-                                    Horizontal::Right
                                 } else {
-                                    // player is to the left, go left
-                                    Horizontal::Left
-                                };
-
-                                // setup the vertical direction
-                                preferred_vertical.vertical = if ver_diff >= 0.0 {
-                                    // player is below, go down
-                                    Vertical::Down
-                                } else {
-                                    // player is above, go up
-                                    Vertical::Up
-                                };
-
-                                let (preferred_direction, second_preferred_direction) = if hor_diff.abs() > ver_diff.abs() {
-                                    // go in a horizontal direction
-                                    (preferred_horizontal, preferred_vertical)
-                                } else {
-                                    // go in a vertical direction
-                                    (preferred_vertical, preferred_horizontal)
-                                };
-
-                                let (mut direction_not_found, mut decision_index) = find_direction_match(&available_directions, &preferred_direction);
-                                if !direction_not_found {
-                                    decision = decision_index;
-                                } else {
-                                    (direction_not_found, decision_index) = find_direction_match(&available_directions, &second_preferred_direction);
-                                    if !direction_not_found {
-                                        decision = decision_index;
-                                    } else {
-                                        // neither choice is any good, choose at random
-                                        if available_directions.len() > 1 {
-                                            decision = thread_rng().gen_range(0..available_directions.len());
-                                        }
-                                    }
-                                }
-
-                                if available_directions.len() > 1 {
-                                    info!("Dir count: {:?}, Decision: {decision}, Preferred direction: {:?}, {:?}",
-                                        available_directions.len(),
-                                        preferred_direction,
-                                        second_preferred_direction
-                                    );
+                                    // decisively go towards player
+                                    decision = ghost_to_position(player_game_pos, new_pos, &available_directions);
                                 }
                             }
 
@@ -328,6 +291,7 @@ fn move_ghost(
                                 }
                             }
                             
+                            ghost.last_decision_point = rounded_new_pos;
                         }
                     }
                     
@@ -386,4 +350,61 @@ fn find_direction_match(available_directions: &Vec<Direction>, search: &Directio
     }
     
     (decision_index == available_directions.len(), found_index)
+}
+
+fn ghost_to_position(position_aim: Vec2, current_position: Vec2, available_directions: &Vec<Direction>) -> usize {
+    let mut decision = 0;
+    
+    // go towards position_aim
+    // find max difference between vertical and horizontal and decide to go that direction
+    //let mut preferred_direction = ghost.direction_of_travel;
+    let mut preferred_horizontal =  Direction {horizontal: Horizontal::Zero, vertical: Vertical::Zero};
+    let mut preferred_vertical = Direction {horizontal: Horizontal::Zero, vertical: Vertical::Zero};
+
+    let hor_diff = position_aim.x - current_position.x;
+    let ver_diff = position_aim.y - current_position.y;
+    
+    
+    // setup the horizontal direction
+    preferred_horizontal.horizontal = if hor_diff >= 0.0 {
+        // player is to the right, go right
+        Horizontal::Right
+    } else {
+        // player is to the left, go left
+        Horizontal::Left
+    };
+
+    // setup the vertical direction
+    preferred_vertical.vertical = if ver_diff >= 0.0 {
+        // player is below, go down
+        Vertical::Down
+    } else {
+        // player is above, go up
+        Vertical::Up
+    };
+
+    let (preferred_direction, second_preferred_direction) = if hor_diff.abs() > ver_diff.abs() {
+        // go in a horizontal direction
+        (preferred_horizontal, preferred_vertical)
+    } else {
+        // go in a vertical direction
+        (preferred_vertical, preferred_horizontal)
+    };
+
+    let (mut direction_not_found, mut decision_index) = find_direction_match(available_directions, &preferred_direction);
+    if !direction_not_found {
+        decision = decision_index;
+    } else {
+        (direction_not_found, decision_index) = find_direction_match(available_directions, &second_preferred_direction);
+        if !direction_not_found {
+            decision = decision_index;
+        } else {
+            // neither choice is any good, choose at random
+            if available_directions.len() > 1 {
+                decision = thread_rng().gen_range(0..available_directions.len());
+            }
+        }
+    }
+
+    return decision;
 }
