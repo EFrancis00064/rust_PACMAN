@@ -34,7 +34,7 @@ fn spawn_game_ui(mut commands: Commands) {
             commands.spawn((
                 TextBundle {
                     text: Text::from_section(
-                        "Money",
+                        "Score: ",
                         TextStyle {
                             font_size: 20.0,
                             ..default()

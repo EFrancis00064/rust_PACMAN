@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 use rand::prelude::*;
 
-use crate::gamelogic::{at_decision_point, get_available_directions, get_new_position_alt, GameLogic, Horizontal, Player, Vertical};
+use crate::gamelogic::{at_decision_point, check_collision, get_available_directions, get_new_position_alt, GameLogic, Horizontal, Player, Vertical};
 use crate::{AnimationIndicies, AnimationTimer};
 use crate::gamelogic;
 use gamelogic::Direction;
@@ -16,7 +16,7 @@ impl Plugin for GhostPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_systems(Startup, spawn_ghosts)
-            .add_systems(Update, move_ghost);
+            .add_systems(Update, (move_ghost, check_ghost_player_collision));
     }
 }
 
@@ -328,6 +328,28 @@ fn move_ghost(
                 body_transform.translation.x = eye_transform.translation.x;
                 body_transform.translation.y = eye_transform.translation.y;
             }
+        }
+    }
+}
+
+fn check_ghost_player_collision(
+    ghost_tranforms: Query<&Transform, (With<GhostBody>, Without<Player>)>,
+    player_transform: Query<&Transform, (With<Player>, Without<Ghost>)>
+) {
+    let player_transform = player_transform.single();
+    let player_rect = Rect::from_center_size(Vec2 {x: player_transform.translation.x, y: player_transform.translation.y}, Vec2 {x: 21.0, y: 21.0});
+
+    //let player_pos = Vec2 {x: player_tranform.translation.x, y: player_tranform.translation.y};
+
+    for ghost_transform in &ghost_tranforms {
+        if check_collision(
+            player_rect,
+            Rect::from_center_size(
+                Vec2 {x: ghost_transform.translation.x, y: ghost_transform.translation.y},
+                Vec2 {x: 21.0, y: 21.0}
+            )
+        ) {
+            // collision detected, lose a life
         }
     }
 }
