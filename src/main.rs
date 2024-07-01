@@ -2,13 +2,15 @@ use bevy::{prelude::*, ui::update};
 //use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
 use ui::GameUI;
-use gamelogic::{Direction, GameLogicPlugin, Horizontal, Player, Vertical};
+use gamelogic::GameLogicPlugin;
+use splashscreen::SplashPlugin;
+use gamestates::GameState;
 
 mod ghost;
 mod ui;
 mod gamelogic;
-
-
+mod splashscreen;
+mod gamestates;
 
 #[derive(Resource)]
 pub struct Score(pub i32);
@@ -46,9 +48,10 @@ fn main() {
         //.add_plugins(
         //    WorldInspectorPlugin::default(),
         //)
-        .add_plugins((GhostPlugin, GameUI, GameLogicPlugin))
+        .add_plugins((SplashPlugin, GhostPlugin, GameUI, GameLogicPlugin))
         .insert_resource(Score(0))
         .insert_resource(CurrentColour(0.0))
+        .add_state::<GameState>() // in later versions of bevy this is init_state
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
         .add_systems(Update, update_multi_colours)
@@ -64,69 +67,6 @@ fn setup(
 
     commands.spawn(camera);
 
-    let background_texture = asset_server.load("Background_single.png");
-
-    commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(410.0, 455.0)),
-                color: Color::Rgba{red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0},
-
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0.0, -10.0, 0.0),
-                ..default()
-            },
-            texture: background_texture,
-            ..default()
-        },
-        MultiColoured,
-    ));
-
-    
-
-    let animation_indicies = AnimationIndicies {first: 0, last: 4};
-
-    let mut pac_sprite = TextureAtlasSprite ::new(animation_indicies.first);
-    pac_sprite.custom_size = Some(Vec2::new(21.0, 20.0)); // had to do this because the sprite was showing one pixel row too many (first row of next frame)
-
-    commands.spawn((
-        SpriteSheetBundle {
-            texture_atlas: texture_atlases.add(
-                TextureAtlas::from_grid(
-                    asset_server.load("Pacman_SpriteSheet.png"),
-                    Vec2::new(21.0, 21.0),
-                    1, 5, None, None
-                )),
-            //sprite: TextureAtlasSprite ::new(animation_indicies.first),
-            sprite: pac_sprite,
-            transform: Transform::from_xyz(0.0, -40.0, 0.01),
-
-            ..default()
-        },
-        animation_indicies,
-        AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player { speed: 6.0, direction_of_travel: Direction {vertical: Vertical::Zero, horizontal: Horizontal::Zero} },
-    ));
-
-    commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(410.0, 455.0)), // same size and position as the background
-                color: Color::Rgba { red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0 },
-
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0.0, -10.0, 0.05),
-                ..default()
-            },
-            texture: asset_server.load("warp_tunnels.png"),
-            ..default()
-        },
-        MultiColoured,
-    ));
 }
 
 fn animate_sprite(

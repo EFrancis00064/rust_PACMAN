@@ -3,7 +3,8 @@ use bevy::prelude::*;
 
 use rand::prelude::*;
 
-use crate::gamelogic::{at_decision_point, check_collision, get_available_directions, get_new_position_alt, GameLogic, Horizontal, Player, Vertical};
+use crate::gamelogic::{at_decision_point, check_collision, get_available_directions, get_new_position_alt, GameLogic, Horizontal, OnGameplayScreen, Player, Vertical};
+use crate::gamestates::{GameState, despawn_screen};
 use crate::{AnimationIndicies, AnimationTimer};
 use crate::gamelogic;
 use gamelogic::Direction;
@@ -15,8 +16,9 @@ pub struct GhostPlugin;
 impl Plugin for GhostPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Startup, spawn_ghosts)
-            .add_systems(Update, (move_ghost, check_ghost_player_collision));
+            .add_systems(OnEnter(GameState::Gameplay), spawn_ghosts)
+            .add_systems(Update, (move_ghost, check_ghost_player_collision).run_if(in_state(GameState::Gameplay)))
+            .add_systems(OnExit(GameState::Gameplay), despawn_screen::<OnGameplayScreen>);
     }
 }
 
@@ -105,6 +107,7 @@ fn spawn_ghosts(
                 ghost_anim_indicies,
                 AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
                 GhostBody {},
+                OnGameplayScreen,
             )).id(),
 
             eyes_entity: commands.spawn((
@@ -122,6 +125,7 @@ fn spawn_ghosts(
                 },
                 eyes_indicies,
                 GhostEyes {},
+                OnGameplayScreen,
 
             )).id(),
 
@@ -130,7 +134,7 @@ fn spawn_ghosts(
             last_decision_point: Vec2 {x: 0.0, y: 0.0},
         };
         
-        commands.spawn(ghost);
+        commands.spawn((ghost, OnGameplayScreen));
 
     }
 

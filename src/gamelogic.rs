@@ -2,7 +2,13 @@ use core::fmt;
 
 use bevy::prelude::*;
 
-use crate::Score;
+use crate::{AnimationIndicies, AnimationTimer, MultiColoured, Score};
+
+use crate::gamestates::{despawn_screen, GameState};
+
+
+#[derive(Component)]
+pub struct OnGameplayScreen;
 
 #[derive(Clone, Copy)]
 enum BlockType {
@@ -63,10 +69,83 @@ pub struct GameLogicPlugin;
 
 impl Plugin for GameLogicPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_gameboard);
-        app.add_systems(Update, (player_movement, check_player_points_collision));
+        app.add_systems(OnEnter(GameState::Gameplay), (setup_gameboard, setup_game_objects));
+        app.add_systems(Update, (player_movement, check_player_points_collision).run_if(in_state(GameState::Gameplay)));
+        app.add_systems(OnExit(GameState::Gameplay), despawn_screen::<OnGameplayScreen>);
     }
 }
+fn setup_game_objects(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>
+) {
+    
+    let background_texture = asset_server.load("Background_single.png");
+
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(410.0, 455.0)),
+                color: Color::Rgba{red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0},
+
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0.0, -10.0, 0.0),
+                ..default()
+            },
+            texture: background_texture,
+            ..default()
+        },
+        MultiColoured,
+        OnGameplayScreen,
+    ));
+    
+    let animation_indicies = AnimationIndicies {first: 0, last: 4};
+
+    let mut pac_sprite = TextureAtlasSprite ::new(animation_indicies.first);
+    pac_sprite.custom_size = Some(Vec2::new(21.0, 20.0)); // had to do this because the sprite was showing one pixel row too many (first row of next frame)
+
+    commands.spawn((
+        SpriteSheetBundle {
+            texture_atlas: texture_atlases.add(
+                TextureAtlas::from_grid(
+                    asset_server.load("Pacman_SpriteSheet.png"),
+                    Vec2::new(21.0, 21.0),
+                    1, 5, None, None
+                )),
+            //sprite: TextureAtlasSprite ::new(animation_indicies.first),
+            sprite: pac_sprite,
+            transform: Transform::from_xyz(0.0, -40.0, 0.01),
+
+            ..default()
+        },
+        animation_indicies,
+        AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+        Player { speed: 6.0, direction_of_travel: Direction {vertical: Vertical::Zero, horizontal: Horizontal::Zero} },
+        OnGameplayScreen,
+    ));
+
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(410.0, 455.0)), // same size and position as the background
+                color: Color::Rgba { red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0 },
+
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0.0, -10.0, 0.05),
+                ..default()
+            },
+            texture: asset_server.load("warp_tunnels.png"),
+            ..default()
+        },
+        MultiColoured,
+        OnGameplayScreen
+    ));
+}
+
 fn setup_gameboard(mut commands: Commands) {
     
     let game_logic: GameLogic = GameLogic {
@@ -136,7 +215,8 @@ fn setup_gameboard(mut commands: Commands) {
                             0.0105), // this should be below the warp tunnel z but above the character z level
                         ..default()
                     },
-                    PointTokenEntity));
+                    PointTokenEntity,
+                    OnGameplayScreen));
                 },
                 _ => (),
             }
@@ -147,9 +227,10 @@ fn setup_gameboard(mut commands: Commands) {
         col_index = 0;
     }
     
-    commands.spawn(
-        game_logic
-    );
+    commands.spawn((
+        game_logic,
+        OnGameplayScreen,
+    ));
 
 }
 
