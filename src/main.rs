@@ -18,6 +18,9 @@ pub struct Score(pub i32);
 #[derive(Resource)]
 pub struct CurrentColour(f32);
 
+#[derive(Resource)]
+pub struct LivesLeft(i32);
+
 #[derive(Component)]
 struct AnimationIndicies {
     first: usize,
@@ -51,6 +54,7 @@ fn main() {
         .add_plugins((SplashPlugin, GhostPlugin, GameUI, GameLogicPlugin))
         .insert_resource(Score(0))
         .insert_resource(CurrentColour(0.0))
+        .insert_resource(LivesLeft(0))
         .add_state::<GameState>() // in later versions of bevy this is init_state
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
@@ -60,8 +64,6 @@ fn main() {
 
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
     let camera = Camera2dBundle::default();
 

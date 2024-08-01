@@ -26,6 +26,7 @@ fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
                     align_items: AlignItems::Center,
+                    justify_items: JustifyItems::Center,
                     padding: UiRect::all(Val::Px(10.0)),
                     ..default()
                 },
@@ -45,7 +46,7 @@ fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                     }
                 ),
                 ..default()
-            }
+            }.with_text_alignment(TextAlignment::Center)
         );
     });
 }
@@ -55,7 +56,7 @@ fn check_start_pressed(
     input: Res<Input<KeyCode>>,
 ) {
     if input.just_pressed(KeyCode::Space) {
-        game_state.set(GameState::Gameplay);
+        game_state.set(GameState::LevelSetup);
     }
 }
 

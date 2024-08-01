@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use rand::prelude::*;
 
 use crate::gamelogic::{at_decision_point, check_collision, get_available_directions, get_new_position_alt, GameLogic, Horizontal, OnGameplayScreen, Player, Vertical};
-use crate::gamestates::{GameState, despawn_screen};
+use crate::gamestates::GameState;
 use crate::{AnimationIndicies, AnimationTimer};
 use crate::gamelogic;
 use gamelogic::Direction;
@@ -16,9 +16,8 @@ pub struct GhostPlugin;
 impl Plugin for GhostPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(OnEnter(GameState::Gameplay), spawn_ghosts)
-            .add_systems(Update, (move_ghost, check_ghost_player_collision).run_if(in_state(GameState::Gameplay)))
-            .add_systems(OnExit(GameState::Gameplay), despawn_screen::<OnGameplayScreen>);
+            .add_systems(OnEnter(GameState::LevelSetup), spawn_ghosts)
+            .add_systems(Update, (move_ghost, check_ghost_player_collision).run_if(in_state(GameState::Gameplay)));
     }
 }
 
@@ -338,7 +337,8 @@ fn move_ghost(
 
 fn check_ghost_player_collision(
     ghost_tranforms: Query<&Transform, (With<GhostBody>, Without<Player>)>,
-    player_transform: Query<&Transform, (With<Player>, Without<Ghost>)>
+    player_transform: Query<&Transform, (With<Player>, Without<Ghost>)>,
+    mut game_state: ResMut<NextState<GameState>>,
 ) {
     let player_transform = player_transform.single();
     let player_rect = Rect::from_center_size(Vec2 {x: player_transform.translation.x, y: player_transform.translation.y}, Vec2 {x: 21.0, y: 21.0});
@@ -354,6 +354,7 @@ fn check_ghost_player_collision(
             )
         ) {
             // collision detected, lose a life
+            game_state.set(GameState::LoseLife);
         }
     }
 }

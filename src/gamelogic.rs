@@ -1,11 +1,18 @@
 use core::fmt;
+use std::time::Duration;
 
-use bevy::prelude::*;
+use bevy::ecs::query;
+use bevy::{animation, prelude::*};
 
-use crate::{AnimationIndicies, AnimationTimer, MultiColoured, Score};
+use crate::ghost::GhostEyes;
+use crate::{AnimationIndicies, AnimationTimer, MultiColoured, Score, LivesLeft};
 
 use crate::gamestates::{despawn_screen, GameState};
 
+use crate::ui::HeartLife;
+
+#[derive(Resource)]
+pub struct GameStartDelay (Timer);
 
 #[derive(Component)]
 pub struct OnGameplayScreen;
@@ -51,6 +58,9 @@ pub struct Player {
     pub direction_of_travel: Direction,
 }
 
+#[derive(Component, Deref, DerefMut)]
+pub struct LoseLife(Timer);
+
 #[derive(Component)]
 pub struct PointTokenEntity;
 
@@ -69,38 +79,25 @@ pub struct GameLogicPlugin;
 
 impl Plugin for GameLogicPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Gameplay), (setup_gameboard, setup_game_objects));
+        app.add_systems(OnEnter(GameState::LevelSetup), (setup_gameboard, setup_game_objects, move_to_gamestart).chain());
+        app.add_systems(OnEnter(GameState::GameStart), (setup_player_object, start_gamestart_timer).chain());
+        app.add_systems(Update, gamestart_delay.run_if(in_state(GameState::GameStart)));
         app.add_systems(Update, (player_movement, check_player_points_collision).run_if(in_state(GameState::Gameplay)));
-        app.add_systems(OnExit(GameState::Gameplay), despawn_screen::<OnGameplayScreen>);
+        app.add_systems(Update, check_lose_life_animation.run_if(in_state(GameState::LoseLife)));
+        app.add_systems(OnEnter(GameState::LevelComplete), despawn_screen::<OnGameplayScreen>);
+        app.add_systems(OnEnter(GameState::GameOver), despawn_screen::<OnGameplayScreen>);
+        app.add_systems(OnEnter(GameState::LoseLife), (handle_lose_life, despawn_screen::<Player>).chain());
+        app.add_systems(OnExit(GameState::LoseLife), despawn_screen::<LoseLife>);
+
+        app.insert_resource(GameStartDelay {0: Timer::new(Duration::from_secs(3), TimerMode::Once)});
     }
 }
-fn setup_game_objects(
+
+fn setup_player_object(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>
 ) {
-    
-    let background_texture = asset_server.load("Background_single.png");
-
-    commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(410.0, 455.0)),
-                color: Color::Rgba{red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0},
-
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0.0, -10.0, 0.0),
-                ..default()
-            },
-            texture: background_texture,
-            ..default()
-        },
-        MultiColoured,
-        OnGameplayScreen,
-    ));
-    
     let animation_indicies = AnimationIndicies {first: 0, last: 4};
 
     let mut pac_sprite = TextureAtlasSprite ::new(animation_indicies.first);
@@ -125,7 +122,32 @@ fn setup_game_objects(
         Player { speed: 6.0, direction_of_travel: Direction {vertical: Vertical::Zero, horizontal: Horizontal::Zero} },
         OnGameplayScreen,
     ));
+}
 
+fn setup_game_objects(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    let background_texture = asset_server.load("Background_single.png");
+
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(410.0, 455.0)),
+                color: Color::Rgba{red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0},
+
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0.0, -10.0, 0.0),
+                ..default()
+            },
+            texture: background_texture,
+            ..default()
+        },
+        MultiColoured,
+        OnGameplayScreen,
+    ));
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
@@ -146,8 +168,12 @@ fn setup_game_objects(
     ));
 }
 
-fn setup_gameboard(mut commands: Commands) {
-    
+fn setup_gameboard(
+    mut commands: Commands,
+    mut lives_left: ResMut<LivesLeft>,
+) {
+    lives_left.0 = 3;
+
     let game_logic: GameLogic = GameLogic {
     // initialise all the game blocks to default values (as a wall)
         //game_blocks: [[BlockCell::default(); BOARD_HEIGHT]; BOARD_WIDTH], //[[BlockCell {exit_path_count: 0, block_type: BlockType::Wall, block_reward:BlockReward::Nothing}; 20]; 24];
@@ -232,6 +258,29 @@ fn setup_gameboard(mut commands: Commands) {
         OnGameplayScreen,
     ));
 
+}
+
+fn move_to_gamestart (
+    mut game_state: ResMut<NextState<GameState>>,
+) {
+    game_state.set(GameState::GameStart);
+}
+
+fn start_gamestart_timer(
+    mut gamestart_timer: ResMut<GameStartDelay>,
+) {
+    gamestart_timer.0.reset()
+}
+
+fn gamestart_delay(
+    mut gamestart_timer: ResMut<GameStartDelay>,
+    time: Res<Time>,
+    mut game_state: ResMut<NextState<GameState>>
+) {
+    gamestart_timer.0.tick(time.delta());
+    if gamestart_timer.0.finished() {
+        game_state.set(GameState::Gameplay);
+    }
 }
 
 fn player_movement(
@@ -417,13 +466,19 @@ fn check_player_points_collision(
     point_tokens_query: Query<(&Sprite, &Transform, Entity), With<PointTokenEntity>>,
     mut commands: Commands,
     mut score: ResMut<Score>,
+    mut game_state: ResMut<NextState<GameState>>,
 ) {
     let player = player_query.single();
     let player_rect = Rect::from_center_size(Vec2 {x: player.translation.x, y: player.translation.y}, Vec2 {x: 21.0, y: 21.0});
 
     //let player_bounding_rect = Rect::from_center_size(Vec2 {x: player.translation.x, y: player.translation.y}, Vec2 {x: 15.0, y: 15.0});
+    let mut point_token_counts = 0;
+    let mut point_token_eaten = false;
     for (point_token_sprite, point_token_transform, point_token_entity) in point_tokens_query.iter() {
         // check each object for a collision on the transforms
+
+        point_token_counts += 1;
+
 
         let size = 
         match point_token_sprite.custom_size {
@@ -440,6 +495,72 @@ fn check_player_points_collision(
             score.0 += 10;
             // collision occured - remove the entity and add the associated points to the score
             commands.entity(point_token_entity).despawn();
+
+            point_token_eaten = true;
+        }
+    }
+
+    // check if we have eaten all the point tokens now
+    if point_token_eaten {
+        if point_token_counts <= 1 {
+            game_state.set(GameState::LevelComplete);
+        }
+    }
+}
+
+fn handle_lose_life(
+    player: Query<&Transform, With<Player>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>
+) {
+    // run the lose animation
+    let animation_indicies = AnimationIndicies {first: 0, last: 4};
+
+    let mut pac_sprite = TextureAtlasSprite ::new(animation_indicies.first);
+    pac_sprite.custom_size = Some(Vec2::new(21.0, 20.0)); // had to do this because the sprite was showing one pixel row too many (first row of next frame)
+
+    let player_transform = player.single();
+    let new_transform = Transform::from_xyz(player_transform.translation.x, player_transform.translation.y, 0.01);
+    
+    // spawn a lose life animation here
+    commands.spawn((
+        SpriteSheetBundle {
+            texture_atlas: texture_atlases.add(
+                TextureAtlas::from_grid(
+                    asset_server.load("Pacman_LoseLife_SpriteSheet.png"),
+                    Vec2::new(21.0, 21.0),
+                    1, 5, None, None
+                )),
+            sprite: pac_sprite,
+            transform: new_transform,
+            ..default()
+        },
+        animation_indicies,
+        AnimationTimer(Timer::from_seconds(0.3, TimerMode::Repeating)),
+        LoseLife(Timer::from_seconds(1.2, TimerMode::Once)),
+    ));
+}
+
+fn check_lose_life_animation(
+    time: Res<Time>,
+    mut lose_life: Query<&mut LoseLife>,
+    mut lives_left: ResMut<LivesLeft>,
+    mut game_state: ResMut<NextState<GameState>>,
+    //mut ghosts: Query<&Transform, With<GhostEyes>>,
+) {
+    let mut timer = lose_life.single_mut();
+    timer.tick(time.delta());
+    if timer.finished() {
+
+        // reduce lives left
+        lives_left.0 -= 1;
+
+        if lives_left.0 == 0 {
+            game_state.set(GameState::GameOver);
+        } else {
+            // move ghosts to start locations
+            game_state.set(GameState::GameStart);
         }
     }
 }
@@ -462,26 +583,6 @@ pub fn get_game_board_coords(pos: Vec2) -> Vec2 {
         x: ((pos.x - 17.5) + (SCREEN_WIDTH_PX / 2.0)) / 15.0,
         y: (BOARD_HEIGHT as f32 - 1.0) - (((pos.y - 5.0) + (SCREEN_HEIGHT_PX / 2.0)) / 15.0)
     }
-}
-
-/*
- * Count the number of remaining point tokens
- */
-fn count_point_tokens_left(game_logic: GameLogic) -> u32 {
-    // go through each of the items in the gameboard array
-    let mut count: u32 = 0;
-
-    for row in game_logic.game_blocks {
-        for cell in row {
-            match cell.block_reward {
-                BlockReward::PointToken => {
-                    count += 1;
-                },
-                _ => (),
-            }
-        }
-    }
-    count
 }
 
 /*
