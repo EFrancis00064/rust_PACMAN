@@ -1,4 +1,5 @@
 use bevy::{prelude::*, text::TextLayoutInfo};
+use bevy_inspector_egui::egui::Ui;
 
 use crate::{gamelogic::OnGameplayScreen, Score, LivesLeft, GameState};
 
@@ -49,24 +50,39 @@ fn spawn_game_ui(
                 },
                 ScoreText,
             ));
-            for i in 0..3 {
-                let icon = asset_server.load("Heart.png");
-                commands.spawn((
-                    ImageBundle {
-                        //style: Style {width: Val::Px(30.0),
-                            // This takes the icons out of the flexbox flow, to be positioned exactly
-                            //position_type: PositionType::Absolute,
-                            // The icon will be close to the left border of the button
-                            //left: Val::Px(10.0),
-                        //    ..default()
-                        //},
-                        image: UiImage::new(icon),
+            commands.spawn(
+                NodeBundle {
+                    style: Style {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::FlexEnd,
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(100.0),
+                        padding: UiRect::axes(Val::Px(10.0), Val::Px(0.0)),
                         ..default()
                     },
-                    OnGameplayScreen,
-                    HeartLife(i),
-                ));
-            }
+                    ..default()
+                },
+            )
+            .with_children(|heart_node| {
+                for i in 0..3 {
+                    let icon = asset_server.load("Heart.png");
+                    heart_node.spawn((
+                        ImageBundle {
+                            //style: Style {width: Val::Px(30.0),
+                                // This takes the icons out of the flexbox flow, to be positioned exactly
+                                //position_type: PositionType::Absolute,
+                                // The icon will be close to the left border of the button
+                                //left: Val::Px(10.0),
+                            //    ..default()
+                            //},
+                            image: UiImage::new(icon),
+                            ..default()
+                        },
+                        OnGameplayScreen,
+                        HeartLife(i),
+                    ));
+                }
+            });
         });
 }
 
@@ -83,7 +99,7 @@ fn update_lives_ui(
 ) {
     for (heart_entity, heart_life) in hearts.iter() {
         if heart_life.0 >= lives_left.0 {
-            //commands.entity(heart_entity).despawn();
+            commands.entity(heart_entity).despawn();
         }
     }
 }
