@@ -26,9 +26,13 @@ fn spawn_game_ui(
         .spawn(
             NodeBundle {
                 style: Style {
+                    //width: Val::Px(410.0), //Val::Percent(100.0),
                     width: Val::Percent(100.0),
+                
                     height: Val::Px(20.0),
+                    flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
+                    justify_items: JustifyItems::Center,
                     padding: UiRect::all(Val::Px(10.0)),
                     ..default()
                 },
@@ -37,26 +41,40 @@ fn spawn_game_ui(
             },
         )
         .with_children(|commands| {
-            commands.spawn((
-                TextBundle {
-                    text: Text::from_section(
-                        "Score: ",
-                        TextStyle {
-                            font_size: 20.0,
-                            ..default()
-                        },
-                    ),
+            commands.spawn(
+                NodeBundle {
+                    style: Style {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::FlexStart,
+                        justify_items: JustifyItems::Start,
+                        width: Val::Percent(80.0), // I don't get this? surely if base node is 100% that should be full width
+                        ..default()
+                    },
                     ..default()
                 },
-                ScoreText,
-            ));
+            ).with_children(|commands| {
+                commands.spawn((
+                    TextBundle {
+                        text: Text::from_section(
+                            "Score: ",
+                            TextStyle {
+                                font_size: 20.0,
+                                ..default()
+                            },
+                        ),
+                        ..default()
+                    },
+                    ScoreText,
+                ));
+            });
             commands.spawn(
                 NodeBundle {
                     style: Style {
                         flex_direction: FlexDirection::Row,
                         align_items: AlignItems::FlexEnd,
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(100.0),
+                        justify_items: JustifyItems::End,
+                        width: Val::Percent(20.0),
+                        height: Val::Px(20.0),
                         padding: UiRect::axes(Val::Px(10.0), Val::Px(0.0)),
                         ..default()
                     },
@@ -68,6 +86,10 @@ fn spawn_game_ui(
                     let icon = asset_server.load("Heart.png");
                     heart_node.spawn((
                         ImageBundle {
+                            style: Style {
+                                padding: UiRect::axes(Val::Px(10.0), Val::Px(0.0)),
+                                ..default()
+                            },
                             //style: Style {width: Val::Px(30.0),
                                 // This takes the icons out of the flexbox flow, to be positioned exactly
                                 //position_type: PositionType::Absolute,
