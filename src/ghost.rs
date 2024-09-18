@@ -1,4 +1,3 @@
-use bevy::ecs::schedule::OrElse;
 use bevy::prelude::*;
 
 use rand::prelude::*;
@@ -55,7 +54,7 @@ pub struct GhostEyes {}
 fn spawn_ghosts(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     // spawn our 4 ghosts
 
@@ -69,39 +68,40 @@ fn spawn_ghosts(
     }
 
     let ghost_details: [GhostDetails; 4] = [
-        GhostDetails { name: String::from("Red"),    speed: 4.00, transform: Transform::from_xyz(-20.0, 5.0, 0.011), colour: Color::Rgba {red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0}, time_in_pen: 1.0 },
-        GhostDetails { name: String::from("Cyan"),   speed: 4.01, transform: Transform::from_xyz(0.0, 10.0, 0.011),   colour: Color::Rgba {red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0}, time_in_pen: 5.0 },
-        GhostDetails { name: String::from("Pink"),   speed: 3.99, transform: Transform::from_xyz(20.0, 0.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0}, time_in_pen: 9.0 },
-        GhostDetails { name: String::from("Yellow"), speed: 3.98, transform: Transform::from_xyz(40.0, 15.0, 0.011),  colour: Color::Rgba {red: 1.0, green: 1.0, blue: 0.0, alpha: 1.0}, time_in_pen: 13.0 }
+        GhostDetails { name: String::from("Red"),    speed: 4.00, transform: Transform::from_xyz(-20.0, 5.0, 0.011), colour: Color::srgb (1.0, 0.0, 0.0), time_in_pen: 1.0 },
+        GhostDetails { name: String::from("Cyan"),   speed: 4.01, transform: Transform::from_xyz(0.0, 10.0, 0.011),  colour: Color::srgb (0.0, 1.0, 1.0), time_in_pen: 5.0 },
+        GhostDetails { name: String::from("Pink"),   speed: 3.99, transform: Transform::from_xyz(20.0, 0.0, 0.011),  colour: Color::srgb (1.0, 0.0, 1.0), time_in_pen: 9.0 },
+        GhostDetails { name: String::from("Yellow"), speed: 3.98, transform: Transform::from_xyz(40.0, 15.0, 0.011), colour: Color::srgb (1.0, 1.0, 0.0), time_in_pen: 13.0 }
     ];
 
     for ghost_detail in ghost_details {
 
-        let ghost_size = Vec2::new(21.0, 23.0);
+        let ghost_size = UVec2::new(21, 23);
         let ghost_anim_indicies = AnimationIndicies {first: 0, last: 4};
 
-        let mut ghost_sprite = TextureAtlasSprite::new(ghost_anim_indicies.first);
-        ghost_sprite.color = ghost_detail.colour;
-
         let eyes_indicies = AnimationIndicies {first: 0, last: 4};
-
 
         let ghost = Ghost {
             name: ghost_detail.name,
             direction_of_travel: Direction {vertical: Vertical::Zero, horizontal: Horizontal::Left},
             speed: ghost_detail.speed,
             body_entity: commands.spawn((
-                SpriteSheetBundle {
-                    texture_atlas: texture_atlases.add(TextureAtlas::from_grid(
-                        asset_server.load("GhostBody_SpriteSheet.png"),
-                        ghost_size,
-                        1,
-                        5,
-                        None, None)),
-                    sprite: ghost_sprite,
+                SpriteBundle {
+                    sprite: Sprite {
+                        color: ghost_detail.colour,
+                        ..default()
+                    },
                     transform: ghost_detail.transform,
-
+                    texture: asset_server.load("GhostBody_SpriteSheet.png"),
                     ..default()
+                },
+                TextureAtlas {
+                    layout: texture_atlases.add(TextureAtlasLayout::from_grid(
+                    ghost_size,
+                    1,
+                    5,
+                    None, None)),
+                    index: ghost_anim_indicies.first,
                 },
                 ghost_anim_indicies,
                 AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
@@ -110,17 +110,18 @@ fn spawn_ghosts(
             )).id(),
 
             eyes_entity: commands.spawn((
-                SpriteSheetBundle {
-                    texture_atlas: texture_atlases.add(TextureAtlas::from_grid(
-                        asset_server.load("GhostEyes_SpriteSheet.png"),
+                SpriteBundle {
+                    transform: ghost_detail.transform,
+                    texture: asset_server.load("GhostEyes_SpriteSheet.png"),
+                    ..default()
+                },
+                TextureAtlas {
+                    layout: texture_atlases.add(TextureAtlasLayout::from_grid(
                         ghost_size,
                         1,
                         5,
                         None, None)),
-                    sprite: TextureAtlasSprite::new(eyes_indicies.first),
-                    transform: ghost_detail.transform,
-
-                    ..default()
+                    index: eyes_indicies.first,
                 },
                 eyes_indicies,
                 GhostEyes {},
@@ -151,7 +152,7 @@ fn spawn_ghosts(
 
 fn move_ghost(
     mut ghosts: Query<&mut Ghost>,
-    mut ghost_eyes_transforms: Query<(&mut Transform, &AnimationIndicies, &mut TextureAtlasSprite), (With<GhostEyes>, Without<GhostBody>)>,
+    mut ghost_eyes_transforms: Query<(&mut Transform, &AnimationIndicies, &mut TextureAtlas), (With<GhostEyes>, Without<GhostBody>)>,
     mut ghost_body_transforms: Query<&mut Transform, (With<GhostBody>, Without<GhostEyes>)>,
     player_transform: Query<&Transform, (With<Player>, Without<GhostBody>, Without<GhostEyes>)>,
     game_logic: Query<&GameLogic>,
@@ -161,7 +162,7 @@ fn move_ghost(
     let player_game_pos = get_game_board_coords(Vec2 {x: player_transform.translation.x, y: player_transform.translation.y});
 
     for mut ghost in &mut ghosts {
-        if let Ok((mut eye_transform, indices, mut sprite)) = ghost_eyes_transforms.get_mut(ghost.eyes_entity) {
+        if let Ok((mut eye_transform, indices, mut atlas)) = ghost_eyes_transforms.get_mut(ghost.eyes_entity) {
             
             let mut new_pos = get_game_board_coords(Vec2 {x: eye_transform.translation.x, y: eye_transform.translation.y} );
 
@@ -250,7 +251,7 @@ fn move_ghost(
                     // for each "decision point" only handle them once (each ghost will record which one it has handled most recently)
                     if (rounded_new_pos.x as i32 != ghost.last_decision_point.x as i32 || 
                         rounded_new_pos.y as i32 != ghost.last_decision_point.y as i32) &&
-                        at_decision_point(new_pos, ghost.direction_of_travel, game_logic) {
+                        at_decision_point(new_pos, ghost.direction_of_travel) {
 
                         let available_directions = get_available_directions(new_pos, ghost.direction_of_travel, game_logic);
 
@@ -319,7 +320,7 @@ fn move_ghost(
             
             // if sprite index is valid, update the sprite index
             if sprite_index >= indices.first && sprite_index <= indices.last {
-                sprite.index = sprite_index;
+                atlas.index = sprite_index;
             }
 
             // update transforms for both eyes and body

@@ -18,7 +18,7 @@ impl Plugin for SplashPlugin {
     }
 }
 
-fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn splash_setup(mut commands: Commands) {
     commands.spawn(
         (
             NodeBundle {
@@ -46,14 +46,14 @@ fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                     }
                 ),
                 ..default()
-            }.with_text_alignment(TextAlignment::Center)
+            }.with_text_justify(JustifyText::Center),
         );
     });
 }
 
 fn check_start_pressed(
     mut game_state: ResMut<NextState<GameState>>,
-    input: Res<Input<KeyCode>>,
+    input: Res<ButtonInput<KeyCode>>,
 ) {
     if input.just_pressed(KeyCode::Space) {
         game_state.set(GameState::LevelSetup);

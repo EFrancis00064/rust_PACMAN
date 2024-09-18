@@ -1,4 +1,4 @@
-use bevy::{prelude::*, ui::update};
+use bevy::prelude::*;
 //use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
 use ui::GameUI;
@@ -55,7 +55,7 @@ fn main() {
         .insert_resource(Score(0))
         .insert_resource(CurrentColour(0.0))
         .insert_resource(LivesLeft(0))
-        .add_state::<GameState>() // in later versions of bevy this is init_state
+        .init_state::<GameState>() // in later versions of bevy this is init_state
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
         .add_systems(Update, update_multi_colours)
@@ -76,16 +76,16 @@ fn animate_sprite(
     mut query: Query<(
         &AnimationIndicies,
         &mut AnimationTimer,
-        &mut TextureAtlasSprite,
+        &mut TextureAtlas,
     )>,
 ) {
-    for (indicies, mut timer, mut sprite) in &mut query {
+    for (indicies, mut timer, mut atlas) in &mut query {
         timer.tick(time.delta());
         if timer.just_finished() {
-            sprite.index = if sprite.index == indicies.last {
+            atlas.index = if atlas.index == indicies.last {
                 indicies.first
             } else {
-                sprite.index + 1
+                atlas.index + 1
             };
         }
     }
@@ -131,7 +131,7 @@ fn update_multi_colours (
         r = decimal;
     }
 
-    let sprite_colour = Color::rgb(r, g, b);
+    let sprite_colour = Color::srgb(r, g, b);
 
     //info!("Updating current colour: {:?} {:?}", current_colour_index.0, sprite_colour);
 
