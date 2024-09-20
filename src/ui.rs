@@ -72,9 +72,9 @@ fn spawn_game_ui(
                 NodeBundle {
                     style: Style {
                         flex_direction: FlexDirection::Row,
-                        align_items: AlignItems::FlexEnd,
+                        align_items: AlignItems::End,
                         justify_items: JustifyItems::End,
-                        width: Val::Percent(20.0),
+                        //width: Val::Percent(20.0),
                         height: Val::Px(20.0),
                         padding: UiRect::axes(Val::Px(10.0), Val::Px(0.0)),
                         ..default()
@@ -88,16 +88,9 @@ fn spawn_game_ui(
                     info!("Spawning heart entity: {:?}", heart_node.spawn((
                         ImageBundle {
                             style: Style {
-                                padding: UiRect::axes(Val::Px(10.0), Val::Px(0.0)),
+                                width: Val::Px(20.0),
                                 ..default()
                             },
-                            //style: Style {width: Val::Px(30.0),
-                                // This takes the icons out of the flexbox flow, to be positioned exactly
-                                //position_type: PositionType::Absolute,
-                                // The icon will be close to the left border of the button
-                                //left: Val::Px(10.0),
-                            //    ..default()
-                            //},
                             image: UiImage::new(icon),
                             ..default()
                         },
@@ -124,9 +117,7 @@ fn update_lives_ui(
         //info!("Heart lif")
         info!("Heart life entity: {:?} {:?} {:?}", heart_life.0, lives_left.0, heart_entity);
         if heart_life.0 >= lives_left.0 {
-
-            
-            //commands.entity(heart_entity).despawn();
+            commands.entity(heart_entity).despawn();
         }
     }
 }

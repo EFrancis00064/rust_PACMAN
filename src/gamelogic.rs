@@ -101,10 +101,6 @@ fn setup_player_object(
 
     commands.spawn((
         SpriteBundle {
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(21.0, 20.0)), // had to do this because the sprite was showing one pixel row too many (first row of next frame)
-                ..default()
-            },
             texture: asset_server.load("Pacman_SpriteSheet.png"),
             transform: Transform::from_xyz(0.0, -40.0, 0.01),
             ..default()
@@ -526,7 +522,7 @@ fn handle_lose_life(
     // spawn a lose life animation here
     commands.spawn((
         SpriteBundle {
-            sprite: Sprite {custom_size: Some(Vec2::new(21.0, 20.0)), ..default()},
+            sprite: Sprite {custom_size: Some(Vec2::new(21.0, 21.0)), ..default()},
             texture: asset_server.load("Pacman_LoseLife_SpriteSheet.png"),
             transform: new_transform,
             ..default()
