@@ -1,15 +1,14 @@
-use core::fmt;
+//use core::fmt;
 use std::time::Duration;
 
-use bevy::ecs::query;
-use bevy::{animation, prelude::*};
+use bevy::prelude::*;
 
-use crate::ghost::GhostEyes;
+//use crate::ghost::GhostEyes;
 use crate::{AnimationIndicies, AnimationTimer, MultiColoured, Score, LivesLeft};
 
 use crate::gamestates::{despawn_screen, GameState};
 
-use crate::ui::HeartLife;
+//use crate::ui::HeartLife;
 
 #[derive(Resource)]
 pub struct GameStartDelay (Timer);
@@ -28,7 +27,7 @@ enum BlockType {
 enum BlockReward {
     Nothing,
     PointToken,
-    GhostWeaknessToken,
+    //GhostWeaknessToken,
     //Fruit(String),
 }
 
@@ -96,26 +95,23 @@ impl Plugin for GameLogicPlugin {
 fn setup_player_object(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>
 ) {
     let animation_indicies = AnimationIndicies {first: 0, last: 4};
 
-    let mut pac_sprite = TextureAtlasSprite ::new(animation_indicies.first);
-    pac_sprite.custom_size = Some(Vec2::new(21.0, 20.0)); // had to do this because the sprite was showing one pixel row too many (first row of next frame)
-
     commands.spawn((
-        SpriteSheetBundle {
-            texture_atlas: texture_atlases.add(
-                TextureAtlas::from_grid(
-                    asset_server.load("Pacman_SpriteSheet.png"),
-                    Vec2::new(21.0, 21.0),
+        SpriteBundle {
+            texture: asset_server.load("Pacman_SpriteSheet.png"),
+            transform: Transform::from_xyz(0.0, -40.0, 0.01),
+            ..default()
+        },
+        TextureAtlas {
+            layout: texture_atlases.add(
+                TextureAtlasLayout::from_grid(
+                    UVec2::new(21, 21),
                     1, 5, None, None
                 )),
-            //sprite: TextureAtlasSprite ::new(animation_indicies.first),
-            sprite: pac_sprite,
-            transform: Transform::from_xyz(0.0, -40.0, 0.01),
-
-            ..default()
+            index: animation_indicies.first,
         },
         animation_indicies,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
@@ -134,7 +130,7 @@ fn setup_game_objects(
         SpriteBundle {
             sprite: Sprite {
                 custom_size: Some(Vec2::new(410.0, 455.0)),
-                color: Color::Rgba{red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0},
+                color: Color::srgb(0.0, 0.0, 1.0),
 
                 ..default()
             },
@@ -152,7 +148,7 @@ fn setup_game_objects(
         SpriteBundle {
             sprite: Sprite {
                 custom_size: Some(Vec2::new(410.0, 455.0)), // same size and position as the background
-                color: Color::Rgba { red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0 },
+                color: Color::srgb(0.0, 1.0, 1.0),
 
                 ..default()
             },
@@ -286,7 +282,7 @@ fn gamestart_delay(
 fn player_movement(
     mut player_query: Query<(&mut Transform, &mut Player)>,
     game_logic_query: Query<&GameLogic>,
-    input: Res<Input<KeyCode>>,
+    input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
     // extract the transform and the player objects from the query
@@ -306,19 +302,19 @@ fn player_movement(
     let mut pressed_direction = Direction {vertical : Vertical::Zero, horizontal : Horizontal::Zero};
 
     // convert keycode into a direction
-    if input.pressed(KeyCode::Up) {
+    if input.pressed(KeyCode::ArrowUp) {
         pressed_direction.vertical = Vertical::Up;
     }
-    if input.pressed(KeyCode::Down) {
+    if input.pressed(KeyCode::ArrowDown) {
         pressed_direction.vertical = match pressed_direction.vertical {
             Vertical::Up => { Vertical::Zero }, // pressing up and down together cancel out
             _ => { Vertical::Down }
         }
     }
-    if input.pressed(KeyCode::Right) {
+    if input.pressed(KeyCode::ArrowRight) {
         pressed_direction.horizontal = Horizontal::Right;
     }
-    if input.pressed(KeyCode::Left) {
+    if input.pressed(KeyCode::ArrowLeft) {
         pressed_direction.horizontal = match pressed_direction.horizontal {
             Horizontal::Right => { Horizontal::Zero }, // pressing left and right together cancel out
             _ => { Horizontal::Left }
@@ -347,7 +343,7 @@ fn player_movement(
             //let rounded_pos = current_pos.round();
             // don't let the turn happen if we are too far away from the center position -- ASSUMPTION: ALL CORRIDOORS ARE ONLY 1 BLOCK WIDE
 
-            skip_get_pos = !at_decision_point(current_pos, player.direction_of_travel, game_logic);
+            skip_get_pos = !at_decision_point(current_pos, player.direction_of_travel);
             potential_pos.1 = skip_get_pos;
         }
 
@@ -380,7 +376,7 @@ fn player_movement(
             //let rounded_pos = current_pos.round();
             // don't let the turn happen if we are too far away from the center position -- ASSUMPTION: ALL CORRIDOORS ARE ONLY 1 BLOCK WIDE
 
-            skip_get_pos = !at_decision_point(current_pos, player.direction_of_travel, game_logic);
+            skip_get_pos = !at_decision_point(current_pos, player.direction_of_travel);
             potential_pos.1 = skip_get_pos;
         }
 
@@ -512,34 +508,39 @@ fn handle_lose_life(
     player: Query<&Transform, With<Player>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     // run the lose animation
     let animation_indicies = AnimationIndicies {first: 0, last: 4};
 
-    let mut pac_sprite = TextureAtlasSprite ::new(animation_indicies.first);
-    pac_sprite.custom_size = Some(Vec2::new(21.0, 20.0)); // had to do this because the sprite was showing one pixel row too many (first row of next frame)
+    //let mut pac_sprite = TextureAtlasSprite ::new(animation_indicies.first);
+    //pac_sprite.custom_size = Some(Vec2::new(21.0, 20.0)); // had to do this because the sprite was showing one pixel row too many (first row of next frame)
 
     let player_transform = player.single();
     let new_transform = Transform::from_xyz(player_transform.translation.x, player_transform.translation.y, 0.01);
     
     // spawn a lose life animation here
     commands.spawn((
-        SpriteSheetBundle {
-            texture_atlas: texture_atlases.add(
-                TextureAtlas::from_grid(
-                    asset_server.load("Pacman_LoseLife_SpriteSheet.png"),
-                    Vec2::new(21.0, 21.0),
-                    1, 5, None, None
-                )),
-            sprite: pac_sprite,
+        SpriteBundle {
+            sprite: Sprite {custom_size: Some(Vec2::new(21.0, 21.0)), ..default()},
+            texture: asset_server.load("Pacman_LoseLife_SpriteSheet.png"),
             transform: new_transform,
             ..default()
         },
+        TextureAtlas {
+            layout: texture_atlases.add(
+                                TextureAtlasLayout::from_grid(
+                                    UVec2::new(21, 21),
+                                    1, 5, None, None
+                                )),
+            index: animation_indicies.first,
+        },
+        //TextureAtlasIndex(animation_indicies.first),
         animation_indicies,
         AnimationTimer(Timer::from_seconds(0.3, TimerMode::Repeating)),
         LoseLife(Timer::from_seconds(1.2, TimerMode::Once)),
     ));
+
 }
 
 fn check_lose_life_animation(
@@ -675,7 +676,7 @@ pub fn get_new_position_alt(game_logic: &GameLogic, current_pos: Vec2, direction
  * This function doesnt do any actual checking if there are any side passages to go down - for that use get_available_directions
  * Returns true if the given position is in a potential position to change direction
  */
-pub fn at_decision_point(position: Vec2, direction: Direction, gamelogic: &GameLogic) -> bool {
+pub fn at_decision_point(position: Vec2, direction: Direction) -> bool {
 
     // extract the position in the axis that we are working with
     let current_pos = if direction.horizontal == Horizontal::Zero { position.y } else { position.x };
