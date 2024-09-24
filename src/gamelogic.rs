@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-//use crate::ghost::GhostEyes;
+use crate::ghost::{GhostBody,GhostEyes, spawn_ghosts};
 use crate::{AnimationIndicies, AnimationTimer, MultiColoured, Score, LivesLeft};
 
 use crate::gamestates::{despawn_screen, GameState};
@@ -86,7 +86,7 @@ impl Plugin for GameLogicPlugin {
         app.add_systems(OnEnter(GameState::LevelComplete), despawn_screen::<OnGameplayScreen>);
         app.add_systems(OnEnter(GameState::GameOver), despawn_screen::<OnGameplayScreen>);
         app.add_systems(OnEnter(GameState::LoseLife), (handle_lose_life, despawn_screen::<Player>).chain());
-        app.add_systems(OnExit(GameState::LoseLife), despawn_screen::<LoseLife>);
+        app.add_systems(OnExit(GameState::LoseLife), ((despawn_screen::<LoseLife>, despawn_screen::<GhostBody>, despawn_screen::<GhostEyes>), spawn_ghosts).chain());
 
         app.insert_resource(GameStartDelay {0: Timer::new(Duration::from_secs(3), TimerMode::Once)});
     }

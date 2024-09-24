@@ -51,7 +51,7 @@ pub struct GhostBody {}
 #[derive(Component)]
 pub struct GhostEyes {}
 
-fn spawn_ghosts(
+pub fn spawn_ghosts(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
@@ -68,13 +68,16 @@ fn spawn_ghosts(
     }
 
     let ghost_details: [GhostDetails; 4] = [
-        GhostDetails { name: String::from("Red"),    speed: 4.00, transform: Transform::from_xyz(-20.0, 5.0, 0.011), colour: Color::srgb (1.0, 0.0, 0.0), time_in_pen: 1.0 },
-        GhostDetails { name: String::from("Cyan"),   speed: 4.01, transform: Transform::from_xyz(0.0, 10.0, 0.011),  colour: Color::srgb (0.0, 1.0, 1.0), time_in_pen: 5.0 },
-        GhostDetails { name: String::from("Pink"),   speed: 3.99, transform: Transform::from_xyz(20.0, 0.0, 0.011),  colour: Color::srgb (1.0, 0.0, 1.0), time_in_pen: 9.0 },
-        GhostDetails { name: String::from("Yellow"), speed: 3.98, transform: Transform::from_xyz(40.0, 15.0, 0.011), colour: Color::srgb (1.0, 1.0, 0.0), time_in_pen: 13.0 }
+        GhostDetails { name: String::from("Red"),    speed: 4.00, transform: Transform::from_xyz(-20.0, 5.0, 0.01101), colour: Color::srgb (1.0, 0.0, 0.0), time_in_pen: 1.0 },
+        GhostDetails { name: String::from("Cyan"),   speed: 4.01, transform: Transform::from_xyz(0.0, 10.0, 0.01102),  colour: Color::srgb (0.0, 1.0, 1.0), time_in_pen: 5.0 },
+        GhostDetails { name: String::from("Pink"),   speed: 3.99, transform: Transform::from_xyz(20.0, 0.0, 0.01103),  colour: Color::srgb (1.0, 0.0, 1.0), time_in_pen: 9.0 },
+        GhostDetails { name: String::from("Yellow"), speed: 3.98, transform: Transform::from_xyz(40.0, 15.0, 0.01104), colour: Color::srgb (1.0, 1.0, 0.0), time_in_pen: 13.0 }
     ];
 
     for ghost_detail in ghost_details {
+
+        let mut eyes_transform = ghost_detail.transform.clone();
+        eyes_transform.translation.z += 0.00001;
 
         let ghost_size = UVec2::new(21, 23);
         let ghost_anim_indicies = AnimationIndicies {first: 0, last: 4};
@@ -111,7 +114,7 @@ fn spawn_ghosts(
 
             eyes_entity: commands.spawn((
                 SpriteBundle {
-                    transform: ghost_detail.transform,
+                    transform: eyes_transform,
                     texture: asset_server.load("GhostEyes_SpriteSheet.png"),
                     ..default()
                 },
