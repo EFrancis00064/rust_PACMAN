@@ -24,6 +24,7 @@ pub enum GhostStatus {
     InPen,
     LeavingPen,
     SearchingForPlayer,
+    Weakened,
     RunningToPen,
 }
 
@@ -41,6 +42,8 @@ pub struct Ghost {
     pub time_in_pen: Timer,
 
     pub name: String,
+
+    pub base_colour: Color,
 
     pub last_decision_point: Vec2,
 }
@@ -68,10 +71,14 @@ pub fn spawn_ghosts(
     }
 
     let ghost_details: [GhostDetails; 4] = [
-        GhostDetails { name: String::from("Red"),    speed: 4.00, transform: Transform::from_xyz(-20.0, 5.0, 0.01101), colour: Color::srgb (1.0, 0.0, 0.0), time_in_pen: 1.0 },
-        GhostDetails { name: String::from("Cyan"),   speed: 4.01, transform: Transform::from_xyz(0.0, 10.0, 0.01102),  colour: Color::srgb (0.0, 1.0, 1.0), time_in_pen: 5.0 },
-        GhostDetails { name: String::from("Pink"),   speed: 3.99, transform: Transform::from_xyz(20.0, 0.0, 0.01103),  colour: Color::srgb (1.0, 0.0, 1.0), time_in_pen: 9.0 },
-        GhostDetails { name: String::from("Yellow"), speed: 3.98, transform: Transform::from_xyz(40.0, 15.0, 0.01104), colour: Color::srgb (1.0, 1.0, 0.0), time_in_pen: 13.0 }
+        // red
+        GhostDetails { name: String::from("Blinky"),    speed: 4.00, transform: Transform::from_xyz(-20.0, 5.0, 0.01101), colour: Color::srgb (1.0, 0.0, 0.0), time_in_pen: 1.0 },
+        // cyan
+        GhostDetails { name: String::from("Inky"),   speed: 4.01, transform: Transform::from_xyz(0.0, 10.0, 0.01102),  colour: Color::srgb (0.0, 1.0, 1.0), time_in_pen: 5.0 },
+        // pink
+        GhostDetails { name: String::from("Pinky"),   speed: 3.99, transform: Transform::from_xyz(20.0, 0.0, 0.01103),  colour: Color::srgb (1.0, 0.0, 1.0), time_in_pen: 9.0 },
+        // yellow
+        GhostDetails { name: String::from("Clyde"), speed: 3.98, transform: Transform::from_xyz(40.0, 15.0, 0.01104), colour: Color::srgb (1.0, 1.0, 0.0), time_in_pen: 13.0 }
     ];
 
     for ghost_detail in ghost_details {
@@ -135,6 +142,7 @@ pub fn spawn_ghosts(
             status: GhostStatus::InPen, // all ghosts start in the pen
             time_in_pen: Timer::from_seconds(ghost_detail.time_in_pen, TimerMode::Once),
             last_decision_point: Vec2 {x: 0.0, y: 0.0},
+            base_colour: ghost_detail.colour,
         };
         
         commands.spawn((ghost, OnGameplayScreen));
@@ -307,7 +315,10 @@ fn move_ghost(
 
 
                 },
-                GhostStatus::RunningToPen => {}
+                GhostStatus::Weakened => {
+                    // TODO: Implement weakened movement
+                },
+                GhostStatus::RunningToPen => {},
             }
 
 

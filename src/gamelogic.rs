@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-use crate::ghost::{GhostBody,GhostEyes, spawn_ghosts};
+use crate::ghost::{spawn_ghosts, Ghost, GhostBody, GhostEyes, GhostStatus};
 use crate::{AnimationIndicies, AnimationTimer, MultiColoured, Score, LivesLeft};
 
 use crate::gamestates::{despawn_screen, GameState};
@@ -27,7 +27,7 @@ enum BlockType {
 enum BlockReward {
     Nothing,
     PointToken,
-    //GhostWeaknessToken,
+    GhostWeaknessToken,
     //Fruit(String),
 }
 
@@ -64,6 +64,9 @@ pub struct LoseLife(Timer);
 pub struct PointTokenEntity;
 
 #[derive(Component)]
+pub struct GhostWeaknessEntity;
+
+#[derive(Component)]
 pub struct GameLogic {
     pub game_blocks: [[BlockCell; BOARD_WIDTH]; BOARD_HEIGHT],
 }
@@ -81,7 +84,7 @@ impl Plugin for GameLogicPlugin {
         app.add_systems(OnEnter(GameState::LevelSetup), (setup_gameboard, setup_game_objects, move_to_gamestart).chain());
         app.add_systems(OnEnter(GameState::GameStart), (setup_player_object, start_gamestart_timer).chain());
         app.add_systems(Update, gamestart_delay.run_if(in_state(GameState::GameStart)));
-        app.add_systems(Update, (player_movement, check_player_points_collision).run_if(in_state(GameState::Gameplay)));
+        app.add_systems(Update, (player_movement, check_player_points_collision, check_player_weak_token_collision).run_if(in_state(GameState::Gameplay)));
         app.add_systems(Update, check_lose_life_animation.run_if(in_state(GameState::LoseLife)));
         app.add_systems(OnEnter(GameState::LevelComplete), despawn_screen::<OnGameplayScreen>);
         app.add_systems(OnEnter(GameState::GameOver), despawn_screen::<OnGameplayScreen>);
@@ -180,10 +183,11 @@ fn setup_gameboard(
             const Q: BlockCell = BlockCell {block_type: BlockType::Path, block_reward: BlockReward::Nothing}; // a path but with no point token
             const X: BlockCell = BlockCell {block_type: BlockType::Warp(25,13), block_reward: BlockReward::Nothing}; // X warps to Y
             const Y: BlockCell = BlockCell {block_type: BlockType::Warp(0, 13), block_reward: BlockReward::Nothing}; // Y warps to X
+            const G: BlockCell = BlockCell {block_type: BlockType::Path, block_reward: BlockReward::GhostWeaknessToken}; // Ghost weakness token
 
            [[P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P], // r0
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r1
-            [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r2
+            [G, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, G], // r2
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r3
             [P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P], // r4
             [P, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, P], // r5
@@ -197,13 +201,13 @@ fn setup_gameboard(
             [X, Q, P, P, P, P, P, P, P, W, W, W, W, W, W, W, W, P, P, P, P, P, P, P, Q, Y], // r13
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r14
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r15
-            [W, W, W, W, W, P, W, W, P, P, P, P, P, P, P, P, P, P, W, W, P, W, W, W, W, W], // r16
+            [W, W, W, W, W, P, W, W, P, P, P, P, Q, Q, P, P, P, P, W, W, P, W, W, W, W, W], // r16
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r17
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r18
             [P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P], // r19
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, W, W, P], // r20
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, W, W, P], // r21
-            [P, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, P], // r22
+            [G, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, G], // r22
             [W, W, P, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, P, W, W], // r23
             [W, W, P, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, P, W, W], // r24
             [P, P, P, P, P, P, W, W, P, P, P, P, W, W, P, P, P, P, W, W, P, P, P, P, P, P], // r25
@@ -219,16 +223,16 @@ fn setup_gameboard(
 
     for block_row in game_logic.game_blocks {
         for block_cell in block_row {
+            
+            let screen_coords = get_screen_coords(col_index as f32, row_index as f32);
+
             match block_cell.block_reward {
                 BlockReward::PointToken => {
                     // block cell is a point token type
                     // spawn a point token in the bevy commands
-                    let screen_coords = get_screen_coords(col_index as f32, row_index as f32);
-
                     commands.spawn((SpriteBundle {
                         sprite: Sprite {
                             custom_size: Some(Vec2::new(5.0, 5.0)),
-                            
                             ..default()
                         },
                         transform: Transform::from_xyz(
@@ -239,6 +243,21 @@ fn setup_gameboard(
                     },
                     PointTokenEntity,
                     OnGameplayScreen));
+                },
+                BlockReward::GhostWeaknessToken => {
+                    commands.spawn((SpriteBundle {
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(15.0, 15.0)),
+                            ..default()
+                        },
+                        transform: Transform::from_xyz(
+                            screen_coords.x,
+                            screen_coords.y,
+                            0.0105),
+                            ..default()
+                        },
+                        GhostWeaknessEntity,
+                        OnGameplayScreen));
                 },
                 _ => (),
             }
@@ -500,6 +519,48 @@ fn check_player_points_collision(
     if point_token_eaten {
         if point_token_counts <= 1 {
             game_state.set(GameState::LevelComplete);
+        }
+    }
+}
+
+fn check_player_weak_token_collision(
+    player_query: Query<&Transform, With<Player>>,
+    weak_tokens_query: Query<(&Sprite, &Transform, Entity), With<GhostWeaknessEntity>>,
+    mut ghost_query: Query<&mut Ghost>,
+    mut ghost_body_sprites: Query<&mut Sprite, (With<GhostBody>, Without<GhostWeaknessEntity>)>,
+    mut score: ResMut<Score>,
+    mut commands: Commands,
+) {
+    let player = player_query.single();
+    let player_rect = Rect::from_center_size(Vec2 {x: player.translation.x, y: player.translation.y}, Vec2 {x: 21.0, y: 21.0});
+
+    for (weak_token_sprite, weak_token_transform, weak_token_entity) in weak_tokens_query.iter() {
+        // check each object for a collision on the transforms
+        let size = 
+        match weak_token_sprite.custom_size {
+            Some(size) => size,
+            None => Vec2 {x: 1.0, y: 1.0}
+        };
+
+        if check_collision(
+            Rect::from_center_size(
+                Vec2 {x: weak_token_transform.translation.x, y: weak_token_transform.translation.y},
+                size), 
+            player_rect)
+        {
+            score.0 += 50;
+            // collision occured - remove the entity and add the associated points to the score
+            commands.entity(weak_token_entity).despawn();
+
+            // TODO: send the ghosts into running back to pen mode
+            for mut ghost in ghost_query.iter_mut() {
+                ghost.speed = ghost.speed / 2.0; // half the speed of the ghosts
+                ghost.status = GhostStatus::Weakened;
+
+                if let Ok(mut ghost_body) = ghost_body_sprites.get_mut(ghost.body_entity) {
+                    ghost_body.color = Color::srgb(0.082, 0.141, 0.380); // a dark navy colour
+                }
+            }
         }
     }
 }
