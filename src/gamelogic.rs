@@ -4,7 +4,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use crate::ghost::{spawn_ghosts, Ghost, GhostBody, GhostEyes, GhostStatus};
-use crate::{AnimationIndicies, AnimationTimer, MultiColoured, Score, LivesLeft};
+use crate::{AnimationIndicies, AnimationTimer, ConsecutiveKills, LivesLeft, MultiColoured, Score};
 
 use crate::gamestates::{despawn_screen, GameState};
 
@@ -529,6 +529,7 @@ fn check_player_weak_token_collision(
     mut ghost_query: Query<&mut Ghost>,
     mut ghost_body_sprites: Query<&mut Sprite, (With<GhostBody>, Without<GhostWeaknessEntity>)>,
     mut score: ResMut<Score>,
+    mut consecutive_kills: ResMut<ConsecutiveKills>,
     mut commands: Commands,
 ) {
     let player = player_query.single();
@@ -552,7 +553,10 @@ fn check_player_weak_token_collision(
             // collision occured - remove the entity and add the associated points to the score
             commands.entity(weak_token_entity).despawn();
 
-            // TODO: send the ghosts into running back to pen mode
+            // reset the consecutive kills value
+            consecutive_kills.0 = 0;
+
+            // send the ghosts into weakened mode
             for mut ghost in ghost_query.iter_mut() {
                 ghost.speed = ghost.speed / 2.0; // half the speed of the ghosts
                 ghost.status = GhostStatus::Weakened;

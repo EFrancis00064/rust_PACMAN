@@ -4,7 +4,7 @@ use rand::prelude::*;
 
 use crate::gamelogic::{at_decision_point, check_collision, get_available_directions, get_new_position_alt, GameLogic, Horizontal, OnGameplayScreen, Player, Vertical};
 use crate::gamestates::GameState;
-use crate::{AnimationIndicies, AnimationTimer};
+use crate::{AnimationIndicies, AnimationTimer, ConsecutiveKills, Score};
 use crate::gamelogic;
 use gamelogic::Direction;
 use gamelogic::get_screen_coords;
@@ -351,25 +351,51 @@ fn move_ghost(
 }
 
 fn check_ghost_player_collision(
-    ghost_tranforms: Query<&Transform, (With<GhostBody>, Without<Player>)>,
-    player_transform: Query<&Transform, (With<Player>, Without<Ghost>)>,
+    mut ghost_bodys: Query<(&Transform, &mut Sprite), (With<GhostBody>, Without<Player>)>,
+    player_transform: Query<&Transform, (With<Player>, Without<GhostBody>)>,
+    mut ghosts: Query<&mut Ghost>,
     mut game_state: ResMut<NextState<GameState>>,
+    mut score: ResMut<Score>,
+    mut consecutive_kills: ResMut<ConsecutiveKills>,
 ) {
     let player_transform = player_transform.single();
     let player_rect = Rect::from_center_size(Vec2 {x: player_transform.translation.x, y: player_transform.translation.y}, Vec2 {x: 21.0, y: 21.0});
 
     //let player_pos = Vec2 {x: player_tranform.translation.x, y: player_tranform.translation.y};
 
-    for ghost_transform in &ghost_tranforms {
-        if check_collision(
-            player_rect,
-            Rect::from_center_size(
-                Vec2 {x: ghost_transform.translation.x, y: ghost_transform.translation.y},
-                Vec2 {x: 21.0, y: 21.0}
-            )
-        ) {
-            // collision detected, lose a life
-            game_state.set(GameState::LoseLife);
+    for mut ghost in &mut ghosts {
+        // get the transform associated with this ghost
+        if let Ok((ghost_transform, mut ghost_sprite)) = ghost_bodys.get_mut(ghost.body_entity) {
+            if check_collision(
+                player_rect,
+                Rect::from_center_size(
+                    Vec2 {x: ghost_transform.translation.x, y: ghost_transform.translation.y},
+                    Vec2 {x: 21.0, y: 21.0}
+                )
+            ) {
+                // collision detected
+                match ghost.status {
+                    GhostStatus::Weakened => {
+                        ghost.status = GhostStatus::RunningToPen;
+                        // set ghost body colour to be transparent
+                        ghost_sprite.color = Color::srgba(0.0, 0.0, 0.0, 0.0);
+
+                        // considered putting a cap on this but normal operation should really only let 
+                        //  the player get to consecutive kills equal to number of ghosts - it could cause a funny, non-game-breaking glitch otherwise
+                        // TLDR; no cap intentionally
+                        consecutive_kills.0 += 1;
+                        score.0 += 100 * consecutive_kills.0;
+                    },
+                    GhostStatus::RunningToPen => {
+                        // ghost is running to pen - do nothing
+                        // if we wanted we could do something here - stall the ghost while it runs home? etc.
+                    }
+                    _ => {
+                        // all other times - touching a ghost means lose a life
+                        game_state.set(GameState::LoseLife);
+                    }
+                }
+            }
         }
     }
 }

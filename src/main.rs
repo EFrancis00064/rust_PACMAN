@@ -16,6 +16,9 @@ mod gamestates;
 pub struct Score(pub i32);
 
 #[derive(Resource)]
+pub struct ConsecutiveKills(pub i32);
+
+#[derive(Resource)]
 pub struct CurrentColour(f32);
 
 #[derive(Resource)]
@@ -55,6 +58,7 @@ fn main() {
         .insert_resource(Score(0))
         .insert_resource(CurrentColour(0.0))
         .insert_resource(LivesLeft(0))
+        .insert_resource(ConsecutiveKills(0))
         .init_state::<GameState>() // in later versions of bevy this is init_state
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
