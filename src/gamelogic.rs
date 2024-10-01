@@ -170,6 +170,7 @@ fn setup_game_objects(
 fn setup_gameboard(
     mut commands: Commands,
     mut lives_left: ResMut<LivesLeft>,
+    asset_server: Res<AssetServer>,
 ) {
     lives_left.0 = 3;
 
@@ -239,6 +240,8 @@ fn setup_gameboard(
                             screen_coords.x,
                             screen_coords.y,
                             0.0105), // this should be below the warp tunnel z but above the character z level
+                        
+                        texture: asset_server.load("Point_token.png"),
                         ..default()
                     },
                     PointTokenEntity,
@@ -254,10 +257,12 @@ fn setup_gameboard(
                             screen_coords.x,
                             screen_coords.y,
                             0.0105),
-                            ..default()
-                        },
-                        GhostWeaknessEntity,
-                        OnGameplayScreen));
+                        texture: asset_server.load("Weakness_token.png"),
+                        ..default()
+                    },
+                    
+                    GhostWeaknessEntity,
+                    OnGameplayScreen));
                 },
                 _ => (),
             }
