@@ -86,7 +86,7 @@ pub fn spawn_ghosts(
         let mut eyes_transform = ghost_detail.transform.clone();
         eyes_transform.translation.z += 0.00001;
 
-        let ghost_size = UVec2::new(21, 23);
+        let ghost_size = UVec2::new(22, 24);
         let ghost_anim_indicies = AnimationIndicies {first: 0, last: 4};
 
         let eyes_indicies = AnimationIndicies {first: 0, last: 4};

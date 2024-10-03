@@ -111,7 +111,7 @@ fn setup_player_object(
         TextureAtlas {
             layout: texture_atlases.add(
                 TextureAtlasLayout::from_grid(
-                    UVec2::new(21, 21),
+                    UVec2::new(22, 22),
                     1, 5, None, None
                 )),
             index: animation_indicies.first,
@@ -132,7 +132,7 @@ fn setup_game_objects(
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
-                custom_size: Some(Vec2::new(410.0, 455.0)),
+                custom_size: Some(Vec2::new(410.0, 456.0)),
                 color: Color::srgb(0.0, 0.0, 1.0),
 
                 ..default()
@@ -150,7 +150,7 @@ fn setup_game_objects(
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
-                custom_size: Some(Vec2::new(410.0, 455.0)), // same size and position as the background
+                custom_size: Some(Vec2::new(410.0, 456.0)), // same size and position as the background
                 color: Color::srgb(0.0, 1.0, 1.0),
 
                 ..default()
@@ -233,7 +233,7 @@ fn setup_gameboard(
                     // spawn a point token in the bevy commands
                     commands.spawn((SpriteBundle {
                         sprite: Sprite {
-                            custom_size: Some(Vec2::new(5.0, 5.0)),
+                            custom_size: Some(Vec2::new(6.0, 6.0)),
                             ..default()
                         },
                         transform: Transform::from_xyz(
@@ -250,7 +250,7 @@ fn setup_gameboard(
                 BlockReward::GhostWeaknessToken => {
                     commands.spawn((SpriteBundle {
                         sprite: Sprite {
-                            custom_size: Some(Vec2::new(15.0, 15.0)),
+                            custom_size: Some(Vec2::new(16.0, 16.0)),
                             ..default()
                         },
                         transform: Transform::from_xyz(
@@ -592,7 +592,7 @@ fn handle_lose_life(
     // spawn a lose life animation here
     commands.spawn((
         SpriteBundle {
-            sprite: Sprite {custom_size: Some(Vec2::new(21.0, 21.0)), ..default()},
+            sprite: Sprite {custom_size: Some(Vec2::new(22.0, 22.0)), ..default()},
             texture: asset_server.load("Pacman_LoseLife_SpriteSheet.png"),
             transform: new_transform,
             ..default()
@@ -600,7 +600,7 @@ fn handle_lose_life(
         TextureAtlas {
             layout: texture_atlases.add(
                                 TextureAtlasLayout::from_grid(
-                                    UVec2::new(21, 21),
+                                    UVec2::new(22, 22),
                                     1, 5, None, None
                                 )),
             index: animation_indicies.first,
@@ -641,7 +641,7 @@ fn check_lose_life_animation(
  */
 pub fn get_screen_coords(col_index: f32, row_index: f32) -> Vec2 {
     Vec2 {
-        x: ((col_index * 15.0) - (SCREEN_WIDTH_PX / 2.0)) + 17.5,
+        x: ((col_index * 15.0) - (SCREEN_WIDTH_PX / 2.0)) + 18.0,
         y: ((((BOARD_HEIGHT as f32 - 1.0) - row_index) * 15.0) - (SCREEN_HEIGHT_PX / 2.0)) + 5.0
     }
 }
@@ -651,7 +651,7 @@ pub fn get_screen_coords(col_index: f32, row_index: f32) -> Vec2 {
  */
 pub fn get_game_board_coords(pos: Vec2) -> Vec2 {
     Vec2 {
-        x: ((pos.x - 17.5) + (SCREEN_WIDTH_PX / 2.0)) / 15.0,
+        x: ((pos.x - 18.0) + (SCREEN_WIDTH_PX / 2.0)) / 15.0,
         y: (BOARD_HEIGHT as f32 - 1.0) - (((pos.y - 5.0) + (SCREEN_HEIGHT_PX / 2.0)) / 15.0)
     }
 }
