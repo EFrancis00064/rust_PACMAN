@@ -44,7 +44,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "PACMAN in Bevy and Rust".into(),
-                        resolution: (410.0, 470.0).into(),
+                        resolution: (410.0, 476.0).into(),
                         resizable: false,
                         ..default()
                     }),
