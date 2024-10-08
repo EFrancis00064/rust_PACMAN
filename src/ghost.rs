@@ -251,72 +251,29 @@ fn move_ghost(
                 },
                 GhostStatus::SearchingForPlayer => {
                     let movement = ghost.speed * time.delta_seconds();
-
-                    // check if we are at an intersection to make a decision
-                    // otherwise just continue in the direction we were going before (no need to change anything)
-
-                    let game_logic = game_logic.single();
-
-                    let rounded_new_pos = new_pos.round();
                     
-                    // for each "decision point" only handle them once (each ghost will record which one it has handled most recently)
-                    if (rounded_new_pos.x as i32 != ghost.last_decision_point.x as i32 || 
-                        rounded_new_pos.y as i32 != ghost.last_decision_point.y as i32) &&
-                        at_decision_point(new_pos, ghost.direction_of_travel) {
+                    // as distance from player gets bigger, chance to do random movements decreases until some threshold
+                    let chance_of_random_action = (distance_from_player / 30.0).min(0.9); // based on distance from player (or 0.9 if distance is too far)
 
-                        let available_directions = get_available_directions(new_pos, ghost.direction_of_travel, game_logic);
-
-                        // make sure there are directions in the list
-                        if available_directions.is_empty() == false {
-                            
-                            let mut decision = 0;
-
-                            // if there is more than 1 available direction
-                            if available_directions.len() != 1 {
-
-                                // as distance from player gets bigger, chance to do random movements decreases until some threshold
-                                let chance_of_random_action = (distance_from_player / 30.0).min(0.9); // based on distance from player (or 0.9 if distance is too far)
-                                
-                                if thread_rng().gen_bool(chance_of_random_action as f64) {
-                                    
-                                    // choose a random direction
-                                    decision = thread_rng().gen_range(0..available_directions.len());
-
-                                } else {
-                                    // decisively go towards player
-                                    decision = ghost_to_position(player_game_pos, new_pos, &available_directions);
-                                }
-                            }
-
-                            // change direction to the one in the decision
-                            let has_changed = available_directions[decision].vertical != ghost.direction_of_travel.vertical ||
-                                                    available_directions[decision].horizontal != ghost.direction_of_travel.horizontal;
-
-                            ghost.direction_of_travel = available_directions[decision];
-
-                            if has_changed {
-                                if let Horizontal::Zero = ghost.direction_of_travel.horizontal {
-                                    // we are now moving vertically
-                                    // snap our position to the rounded x value
-                                    new_pos.x = new_pos.x.round();
-                                } else if let Vertical::Zero = ghost.direction_of_travel.vertical {
-                                    // we are now moving horizontally
-                                    // snap our position to the rounded y value
-                                    new_pos.y = new_pos.y.round();
-                                }
-                            }
-                            
-                            ghost.last_decision_point = rounded_new_pos;
-                        }
-                    }
-                    
-                    // try to move in the current direction of travel
-                    new_pos = get_new_position_alt(game_logic, new_pos, ghost.direction_of_travel, movement).0;
-
+                    new_pos = ghost_decisions(
+                        movement, 
+                        game_logic.single(),
+                        new_pos, 
+                        chance_of_random_action, 
+                        &mut ghost,
+                        player_game_pos
+                    );
 
                 },
                 GhostStatus::Weakened => {
-                    // TODO: Implement weakened movement
+                    // running away from player - ghost will aim for a position that is directly opposite from the position of the player
+                    let movement = ghost.speed * time.delta_seconds();
+
+                    // this is a position directly opposite the player position
+                    let ghost_pos_aim = Vec2::new((2.0 * new_pos.x) - player_game_pos.x, (2.0 * new_pos.y) - player_game_pos.y);
+
+                    new_pos = ghost_decisions(movement, game_logic.single(), new_pos, 0.0, &mut ghost, ghost_pos_aim)
+
                 },
                 GhostStatus::RunningToPen => {},
             }
@@ -348,6 +305,75 @@ fn move_ghost(
             }
         }
     }
+}
+
+fn ghost_decisions(
+    movement_amount: f32,
+    game_logic: &GameLogic,
+    mut current_pos: Vec2,
+    chance_of_random: f32,
+    ghost: &mut Ghost,
+    ghost_pos_aim: Vec2,
+) -> Vec2 {
+    // check if we are at an intersection to make a decision
+    // otherwise just continue in the direction we were going before (no need to change anything)
+
+    let rounded_new_pos = current_pos.round();
+    
+    // for each "decision point" only handle them once (each ghost will record which one it has handled most recently)
+    if (rounded_new_pos.x as i32 != ghost.last_decision_point.x as i32 || 
+        rounded_new_pos.y as i32 != ghost.last_decision_point.y as i32) &&
+        at_decision_point(current_pos, ghost.direction_of_travel) {
+
+        let available_directions = get_available_directions(current_pos, ghost.direction_of_travel, game_logic);
+
+        // make sure there are directions in the list
+        if available_directions.is_empty() == false {
+            
+            let mut decision = 0;
+
+            // if there is more than 1 available direction
+            if available_directions.len() != 1 {
+
+                //let chance_of_random_action = (distance_from_player / 30.0).min(0.9); // based on distance from player (or 0.9 if distance is too far)
+                
+                if thread_rng().gen_bool(chance_of_random as f64) {
+                    
+                    // choose a random direction
+                    decision = thread_rng().gen_range(0..available_directions.len());
+
+                } else {
+
+                    decision = ghost_to_position(ghost_pos_aim, current_pos, &available_directions);
+                }
+            }
+
+            // change direction to the one in the decision
+            let has_changed = available_directions[decision].vertical != ghost.direction_of_travel.vertical ||
+                                    available_directions[decision].horizontal != ghost.direction_of_travel.horizontal;
+
+            ghost.direction_of_travel = available_directions[decision];
+
+            if has_changed {
+                if let Horizontal::Zero = ghost.direction_of_travel.horizontal {
+                    // we are now moving vertically
+                    // snap our position to the rounded x value
+                    current_pos.x = current_pos.x.round();
+                } else if let Vertical::Zero = ghost.direction_of_travel.vertical {
+                    // we are now moving horizontally
+                    // snap our position to the rounded y value
+                    current_pos.y = current_pos.y.round();
+                }
+            }
+            
+            ghost.last_decision_point = rounded_new_pos;
+        }
+    }
+    
+    // try to move in the current direction of travel
+    let new_pos = get_new_position_alt(game_logic, current_pos, ghost.direction_of_travel, movement_amount).0;
+
+    return new_pos;
 }
 
 fn check_ghost_player_collision(
