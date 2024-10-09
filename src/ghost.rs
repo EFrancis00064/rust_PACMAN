@@ -20,13 +20,23 @@ impl Plugin for GhostPlugin {
     }
 }
 
-pub enum GhostStatus {
+pub enum GhostPositionStatus {
     InPen,
+    OutAndAbout,
+    ReturningToPen,
+}
+
+pub enum GhostActionsStatus {
+    Idle, // (in pen)
     LeavingPen,
     SearchingForPlayer,
     Weakened,
     RunningToPen,
+    GoingIntoPen,
 }
+
+const GHOST_WEAKENED_SPEED: f32 = 3.0;
+const GHOST_RUNNING_HOME: f32 = 6.0;
 
 #[derive(Component)]
 pub struct Ghost {
@@ -38,7 +48,9 @@ pub struct Ghost {
 
     pub speed: f32,
 
-    pub status: GhostStatus,
+    pub position_status: GhostPositionStatus,
+    pub actions_status: GhostActionsStatus,
+
     pub time_in_pen: Timer,
 
     pub name: String,
@@ -139,7 +151,8 @@ pub fn spawn_ghosts(
 
             )).id(),
 
-            status: GhostStatus::InPen, // all ghosts start in the pen
+            position_status: GhostPositionStatus::InPen, // all ghosts start in the pen
+            actions_status: GhostActionsStatus::Idle,
             time_in_pen: Timer::from_seconds(ghost_detail.time_in_pen, TimerMode::Once),
             last_decision_point: Vec2 {x: 0.0, y: 0.0},
             base_colour: ghost_detail.colour,
@@ -184,8 +197,8 @@ fn move_ghost(
 
             const PEN_EXIT: Vec2 = Vec2 {x: 12.5, y:10.0};
 
-            match ghost.status {
-                GhostStatus::InPen => {
+            match ghost.actions_status {
+                GhostActionsStatus::Idle => {
                     new_pos.x += pen_movement * ghost.direction_of_travel.horizontal as i32 as f32;
                     new_pos.y += pen_movement * ghost.direction_of_travel.vertical as i32 as f32;
 
@@ -197,10 +210,10 @@ fn move_ghost(
                     
                     ghost.time_in_pen.tick(time.delta());
                     if ghost.time_in_pen.just_finished() {
-                        ghost.status = GhostStatus::LeavingPen;
+                        ghost.actions_status = GhostActionsStatus::LeavingPen;
                     }
                 },
-                GhostStatus::LeavingPen => {
+                GhostActionsStatus::LeavingPen => {
                     // check if we are in line with the pen exit x position
                     if (new_pos.x - PEN_EXIT.x).abs() < 0.1 {
 
@@ -223,7 +236,8 @@ fn move_ghost(
                         if (new_pos.y - PEN_EXIT.y).abs() < 0.01 {
                             new_pos.y = PEN_EXIT.y;
                             // we are out of the pen
-                            ghost.status = GhostStatus::SearchingForPlayer;
+                            ghost.actions_status = GhostActionsStatus::SearchingForPlayer;
+                            ghost.position_status = GhostPositionStatus::OutAndAbout;
                             
                             ghost.direction_of_travel.vertical = Vertical::Zero;
                             
@@ -249,7 +263,7 @@ fn move_ghost(
                     }
 
                 },
-                GhostStatus::SearchingForPlayer => {
+                GhostActionsStatus::SearchingForPlayer => {
                     let movement = ghost.speed * time.delta_seconds();
                     
                     // as distance from player gets bigger, chance to do random movements decreases until some threshold
@@ -265,17 +279,45 @@ fn move_ghost(
                     );
 
                 },
-                GhostStatus::Weakened => {
+                GhostActionsStatus::Weakened => {
                     // running away from player - ghost will aim for a position that is directly opposite from the position of the player
-                    let movement = ghost.speed * time.delta_seconds();
+                    let movement = GHOST_WEAKENED_SPEED * time.delta_seconds();
 
                     // this is a position directly opposite the player position
                     let ghost_pos_aim = Vec2::new((2.0 * new_pos.x) - player_game_pos.x, (2.0 * new_pos.y) - player_game_pos.y);
 
-                    new_pos = ghost_decisions(movement, game_logic.single(), new_pos, 0.0, &mut ghost, ghost_pos_aim)
+                    new_pos = ghost_decisions(
+                        movement,
+                        game_logic.single(),
+                        new_pos,
+                        0.2,
+                        &mut ghost,
+                        ghost_pos_aim
+                    );
 
                 },
-                GhostStatus::RunningToPen => {},
+                GhostActionsStatus::RunningToPen => {
+                    let movement = GHOST_RUNNING_HOME * time.delta_seconds();
+
+                    new_pos = ghost_decisions(
+                        movement,
+                        game_logic.single(),
+                        new_pos,
+                        0.0,
+                        &mut ghost,
+                        PEN_EXIT
+                    );
+
+                    // return the ghost to the pen if the ghost has reached the PEN_EXIT
+                    let diff = (new_pos - PEN_EXIT).abs();
+                    if diff.x < 0.3 && diff.y < 0.3 {
+                        ghost.actions_status = GhostActionsStatus::GoingIntoPen;
+                        new_pos = PEN_EXIT;
+                    }
+                },
+                GhostActionsStatus::GoingIntoPen => {
+                    // move back into the pen - then go back to normal and idle
+                }
             }
 
 
@@ -400,9 +442,10 @@ fn check_ghost_player_collision(
                 )
             ) {
                 // collision detected
-                match ghost.status {
-                    GhostStatus::Weakened => {
-                        ghost.status = GhostStatus::RunningToPen;
+                match ghost.actions_status {
+                    GhostActionsStatus::Weakened => {
+                        ghost.actions_status = GhostActionsStatus::RunningToPen;
+                        ghost.position_status = GhostPositionStatus::ReturningToPen;
                         // set ghost body colour to be transparent
                         ghost_sprite.color = Color::srgba(0.0, 0.0, 0.0, 0.0);
 
@@ -412,7 +455,7 @@ fn check_ghost_player_collision(
                         consecutive_kills.0 += 1;
                         score.0 += 100 * consecutive_kills.0;
                     },
-                    GhostStatus::RunningToPen => {
+                    GhostActionsStatus::RunningToPen => {
                         // ghost is running to pen - do nothing
                         // if we wanted we could do something here - stall the ghost while it runs home? etc.
                     }

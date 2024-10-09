@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-use crate::ghost::{spawn_ghosts, Ghost, GhostBody, GhostEyes, GhostStatus};
+use crate::ghost::{spawn_ghosts, Ghost, GhostBody, GhostEyes, GhostActionsStatus, GhostPositionStatus};
 use crate::{AnimationIndicies, AnimationTimer, ConsecutiveKills, LivesLeft, MultiColoured, Score};
 
 use crate::gamestates::{despawn_screen, GameState};
@@ -563,11 +563,13 @@ fn check_player_weak_token_collision(
 
             // send the ghosts into weakened mode
             for mut ghost in ghost_query.iter_mut() {
-                ghost.speed = ghost.speed / 2.0; // half the speed of the ghosts
-                ghost.status = GhostStatus::Weakened;
+                if let GhostPositionStatus::OutAndAbout = ghost.position_status {
+                    ghost.actions_status = GhostActionsStatus::Weakened;
 
-                if let Ok(mut ghost_body) = ghost_body_sprites.get_mut(ghost.body_entity) {
-                    ghost_body.color = Color::srgb(0.082, 0.141, 0.380); // a dark navy colour
+
+                    if let Ok(mut ghost_body) = ghost_body_sprites.get_mut(ghost.body_entity) {
+                        ghost_body.color = Color::srgb(0.082, 0.141, 0.380); // a dark navy colour
+                    }
                 }
             }
         }
