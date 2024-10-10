@@ -16,7 +16,7 @@ impl Plugin for GhostPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_systems(OnEnter(GameState::LevelSetup), spawn_ghosts)
-            .add_systems(Update, (move_ghost, check_ghost_player_collision).run_if(in_state(GameState::Gameplay)));
+            .add_systems(Update, (move_ghost, check_ghost_player_collision, update_weakened_timers).run_if(in_state(GameState::Gameplay)));
     }
 }
 
@@ -52,6 +52,8 @@ pub struct Ghost {
     pub actions_status: GhostActionsStatus,
 
     pub time_in_pen: Timer,
+
+    pub time_weakened: Option<Timer>,
 
     pub name: String,
 
@@ -154,6 +156,7 @@ pub fn spawn_ghosts(
             position_status: GhostPositionStatus::InPen, // all ghosts start in the pen
             actions_status: GhostActionsStatus::Idle,
             time_in_pen: Timer::from_seconds(ghost_detail.time_in_pen, TimerMode::Once),
+            time_weakened: None,
             last_decision_point: Vec2 {x: 0.0, y: 0.0},
             base_colour: ghost_detail.colour,
         };
@@ -449,6 +452,8 @@ fn check_ghost_player_collision(
                         // set ghost body colour to be transparent
                         ghost_sprite.color = Color::srgba(0.0, 0.0, 0.0, 0.0);
 
+                        ghost.time_weakened = None;
+
                         // considered putting a cap on this but normal operation should really only let 
                         //  the player get to consecutive kills equal to number of ghosts - it could cause a funny, non-game-breaking glitch otherwise
                         // TLDR; no cap intentionally
@@ -458,13 +463,43 @@ fn check_ghost_player_collision(
                     GhostActionsStatus::RunningToPen => {
                         // ghost is running to pen - do nothing
                         // if we wanted we could do something here - stall the ghost while it runs home? etc.
-                    }
-                    _ => {
+                    },
+                    GhostActionsStatus::SearchingForPlayer => {
                         // all other times - touching a ghost means lose a life
                         game_state.set(GameState::LoseLife);
+                    },
+                    _ => {
+
                     }
                 }
             }
+        }
+    }
+}
+
+fn update_weakened_timers(
+    mut ghosts: Query<&mut Ghost>,
+    mut ghost_bodys: Query<&mut Sprite, (With<GhostBody>, Without<Player>)>,
+    time: Res<Time>,
+) {
+    for mut ghost in ghosts.iter_mut() {
+
+        match &mut ghost.time_weakened {
+            Some(timer) => {
+                timer.tick(time.delta());
+            
+                if timer.finished() {
+                    // change this ghost back to normal
+                    ghost.actions_status = GhostActionsStatus::SearchingForPlayer;
+
+                    if let Ok(mut body_sprite) = ghost_bodys.get_mut(ghost.body_entity) {
+                        body_sprite.color = ghost.base_colour;
+                    }
+
+                    ghost.time_weakened = None;
+                }
+            },
+            None => {},
         }
     }
 }

@@ -566,6 +566,7 @@ fn check_player_weak_token_collision(
                 if let GhostPositionStatus::OutAndAbout = ghost.position_status {
                     ghost.actions_status = GhostActionsStatus::Weakened;
 
+                    ghost.time_weakened = Some(Timer::from_seconds(8.0, TimerMode::Once));
 
                     if let Ok(mut ghost_body) = ghost_body_sprites.get_mut(ghost.body_entity) {
                         ghost_body.color = Color::srgb(0.082, 0.141, 0.380); // a dark navy colour
