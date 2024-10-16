@@ -180,7 +180,7 @@ pub fn spawn_ghosts(
 fn move_ghost(
     mut ghosts: Query<&mut Ghost>,
     mut ghost_eyes_transforms: Query<(&mut Transform, &AnimationIndicies, &mut TextureAtlas), (With<GhostEyes>, Without<GhostBody>)>,
-    mut ghost_body_transforms: Query<&mut Transform, (With<GhostBody>, Without<GhostEyes>)>,
+    mut ghost_body_transforms: Query<(&mut Transform, &mut Sprite), (With<GhostBody>, Without<GhostEyes>)>,
     player_transform: Query<&Transform, (With<Player>, Without<GhostBody>, Without<GhostEyes>)>,
     game_logic: Query<&GameLogic>,
     time: Res<Time>,
@@ -190,59 +190,161 @@ fn move_ghost(
 
     for mut ghost in &mut ghosts {
         if let Ok((mut eye_transform, indices, mut atlas)) = ghost_eyes_transforms.get_mut(ghost.eyes_entity) {
-            
-            let mut new_pos = get_game_board_coords(Vec2 {x: eye_transform.translation.x, y: eye_transform.translation.y} );
+            if let Ok((mut body_transform, mut ghost_sprite)) = ghost_body_transforms.get_mut(ghost.body_entity) {
+                
+                let mut new_pos = get_game_board_coords(Vec2 {x: eye_transform.translation.x, y: eye_transform.translation.y} );
 
-            let pen_movement = 2.0 * time.delta_seconds();
-            
-            // distance calculated as pythagoras
-            let distance_from_player = ((player_game_pos.x - new_pos.x).abs().powi(2) + (player_game_pos.y - new_pos.y).abs().powi(2)).sqrt();
+                let pen_movement = 2.0 * time.delta_seconds();
+                
+                // distance calculated as pythagoras
+                let distance_from_player = ((player_game_pos.x - new_pos.x).abs().powi(2) + (player_game_pos.y - new_pos.y).abs().powi(2)).sqrt();
 
-            const PEN_EXIT: Vec2 = Vec2 {x: 12.5, y:10.0};
+                const PEN_EXIT: Vec2 = Vec2 {x: 12.5, y:10.0};
 
-            match ghost.actions_status {
-                GhostActionsStatus::Idle => {
-                    new_pos.x += pen_movement * ghost.direction_of_travel.horizontal as i32 as f32;
-                    new_pos.y += pen_movement * ghost.direction_of_travel.vertical as i32 as f32;
+                match ghost.actions_status {
+                    GhostActionsStatus::Idle => {
+                        new_pos.x += pen_movement * ghost.direction_of_travel.horizontal as i32 as f32;
+                        new_pos.y += pen_movement * ghost.direction_of_travel.vertical as i32 as f32;
 
-                    if new_pos.x > 15.0 {
-                        ghost.direction_of_travel.horizontal = Horizontal::Left;
-                    } else if new_pos.x < 10.0 {
-                        ghost.direction_of_travel.horizontal = Horizontal::Right;
-                    }
-                    
-                    ghost.time_in_pen.tick(time.delta());
-                    if ghost.time_in_pen.just_finished() {
-                        ghost.actions_status = GhostActionsStatus::LeavingPen;
-                    }
-                },
-                GhostActionsStatus::LeavingPen => {
-                    // check if we are in line with the pen exit x position
-                    if (new_pos.x - PEN_EXIT.x).abs() < 0.1 {
-
-                        new_pos.x = PEN_EXIT.x;
+                        if new_pos.x > 15.0 {
+                            ghost.direction_of_travel.horizontal = Horizontal::Left;
+                        } else if new_pos.x < 10.0 {
+                            ghost.direction_of_travel.horizontal = Horizontal::Right;
+                        }
                         
-                        // move towards the pen exit y position
-                        let y_diff = new_pos.y - PEN_EXIT.y;
-                        new_pos.y -= if y_diff > 0.0 {
-                            ghost.direction_of_travel.vertical = Vertical::Up;
+                        ghost.time_in_pen.tick(time.delta());
+                        if ghost.time_in_pen.just_finished() {
+                            ghost.actions_status = GhostActionsStatus::LeavingPen;
+                        }
+                    },
+                    GhostActionsStatus::LeavingPen => {
+                        // check if we are in line with the pen exit x position
+                        if (new_pos.x - PEN_EXIT.x).abs() < 0.1 {
 
-                            pen_movement.min(y_diff) // we are below the exit pos
+                            new_pos.x = PEN_EXIT.x;
+                            
+                            // move towards the pen exit y position
+                            let y_diff = new_pos.y - PEN_EXIT.y;
+                            new_pos.y -= if y_diff > 0.0 {
+                                ghost.direction_of_travel.vertical = Vertical::Up;
+
+                                pen_movement.min(y_diff) // we are below the exit pos
+                            } else {
+                                ghost.direction_of_travel.vertical = Vertical::Down;
+                                (-pen_movement).max(y_diff) // we are above the exit pos
+                            };
+                            
+                            ghost.direction_of_travel.horizontal = Horizontal::Zero;
+
+                            // check if we are now in line with the pen exit y position
+                            if (new_pos.y - PEN_EXIT.y).abs() < 0.01 {
+                                new_pos.y = PEN_EXIT.y;
+                                // we are out of the pen
+                                ghost.actions_status = GhostActionsStatus::SearchingForPlayer;
+                                ghost.position_status = GhostPositionStatus::OutAndAbout;
+                                
+                                ghost.direction_of_travel.vertical = Vertical::Zero;
+                                
+                                if random() { 
+                                    ghost.direction_of_travel.horizontal = Horizontal::Left;
+                                } else {
+                                    ghost.direction_of_travel.horizontal = Horizontal::Right;
+                                }
+                            }
                         } else {
-                            ghost.direction_of_travel.vertical = Vertical::Down;
-                            (-pen_movement).max(y_diff) // we are above the exit pos
-                        };
+                            // move towards pen exit x position
+                            let x_diff = new_pos.x - PEN_EXIT.x;
+
+                            new_pos.x -= if x_diff > 0.0 {
+                                ghost.direction_of_travel.horizontal = Horizontal::Left;
+                                pen_movement.min(x_diff)
+                            } else {
+                                ghost.direction_of_travel.horizontal = Horizontal::Right;
+                                (-pen_movement).max(x_diff)
+                            };
+
+                            ghost.direction_of_travel.vertical = Vertical::Zero;
+                        }
+
+                    },
+                    GhostActionsStatus::SearchingForPlayer => {
+                        let movement = ghost.speed * time.delta_seconds();
                         
+                        // as distance from player gets bigger, chance to do random movements decreases until some threshold
+                        let chance_of_random_action = (distance_from_player / 30.0).min(0.9); // based on distance from player (or 0.9 if distance is too far)
+
+                        new_pos = ghost_decisions(
+                            movement, 
+                            game_logic.single(),
+                            new_pos, 
+                            chance_of_random_action, 
+                            &mut ghost,
+                            player_game_pos
+                        );
+
+                    },
+                    GhostActionsStatus::Weakened => {
+                        // running away from player - ghost will aim for a position that is directly opposite from the position of the player
+                        let movement = GHOST_WEAKENED_SPEED * time.delta_seconds();
+
+                        // this is a position directly opposite the player position
+                        let ghost_pos_aim = Vec2::new((2.0 * new_pos.x) - player_game_pos.x, (2.0 * new_pos.y) - player_game_pos.y);
+
+                        new_pos = ghost_decisions(
+                            movement,
+                            game_logic.single(),
+                            new_pos,
+                            0.2,
+                            &mut ghost,
+                            ghost_pos_aim
+                        );
+
+                    },
+                    GhostActionsStatus::RunningToPen => {
+                        let movement = GHOST_RUNNING_HOME * time.delta_seconds();
+
+                        new_pos = ghost_decisions(
+                            movement,
+                            game_logic.single(),
+                            new_pos,
+                            0.0,
+                            &mut ghost,
+                            PEN_EXIT
+                        );
+
+                        // return the ghost to the pen if the ghost has reached the PEN_EXIT
+                        let diff = (new_pos - PEN_EXIT).abs();
+                        if diff.x < 0.3 && diff.y < 0.3 {
+                            ghost.actions_status = GhostActionsStatus::GoingIntoPen;
+                            new_pos = PEN_EXIT;
+                        }
+                    },
+                    GhostActionsStatus::GoingIntoPen => {
+                        // move back into the pen - then go back to normal and idle
+
+                        const PEN_CENTER: Vec2 = Vec2 { x: 12.5, y: 13.0 };
+
+                        new_pos.x = PEN_CENTER.x;
+                        ghost.direction_of_travel.vertical = Vertical::Down;
                         ghost.direction_of_travel.horizontal = Horizontal::Zero;
 
+                        let y_diff = PEN_CENTER.y - new_pos.y;
+
+                        new_pos.y += pen_movement.min(y_diff); // move either the pen movement or the y diff whichever is smaller
+
+                        
                         // check if we are now in line with the pen exit y position
-                        if (new_pos.y - PEN_EXIT.y).abs() < 0.01 {
-                            new_pos.y = PEN_EXIT.y;
-                            // we are out of the pen
-                            ghost.actions_status = GhostActionsStatus::SearchingForPlayer;
-                            ghost.position_status = GhostPositionStatus::OutAndAbout;
+                        if (new_pos.y - PEN_CENTER.y).abs() < 0.01 {
+                            new_pos.y = PEN_CENTER.y;
+                            // we are now in the center of the pen
+                            ghost.actions_status = GhostActionsStatus::Idle;
+                            ghost.position_status = GhostPositionStatus::InPen;
                             
                             ghost.direction_of_travel.vertical = Vertical::Zero;
+
+                            // regenerate the ghost body
+                            ghost_sprite.color = ghost.base_colour;
+                            ghost.time_in_pen = Timer::from_seconds(5.0, TimerMode::Once);
                             
                             if random() { 
                                 ghost.direction_of_travel.horizontal = Horizontal::Left;
@@ -250,101 +352,30 @@ fn move_ghost(
                                 ghost.direction_of_travel.horizontal = Horizontal::Right;
                             }
                         }
-                    } else {
-                        // move towards pen exit x position
-                        let x_diff = new_pos.x - PEN_EXIT.x;
-
-                        new_pos.x -= if x_diff > 0.0 {
-                            ghost.direction_of_travel.horizontal = Horizontal::Left;
-                            pen_movement.min(x_diff)
-                        } else {
-                            ghost.direction_of_travel.horizontal = Horizontal::Right;
-                            (-pen_movement).max(x_diff)
-                        };
-
-                        ghost.direction_of_travel.vertical = Vertical::Zero;
                     }
-
-                },
-                GhostActionsStatus::SearchingForPlayer => {
-                    let movement = ghost.speed * time.delta_seconds();
-                    
-                    // as distance from player gets bigger, chance to do random movements decreases until some threshold
-                    let chance_of_random_action = (distance_from_player / 30.0).min(0.9); // based on distance from player (or 0.9 if distance is too far)
-
-                    new_pos = ghost_decisions(
-                        movement, 
-                        game_logic.single(),
-                        new_pos, 
-                        chance_of_random_action, 
-                        &mut ghost,
-                        player_game_pos
-                    );
-
-                },
-                GhostActionsStatus::Weakened => {
-                    // running away from player - ghost will aim for a position that is directly opposite from the position of the player
-                    let movement = GHOST_WEAKENED_SPEED * time.delta_seconds();
-
-                    // this is a position directly opposite the player position
-                    let ghost_pos_aim = Vec2::new((2.0 * new_pos.x) - player_game_pos.x, (2.0 * new_pos.y) - player_game_pos.y);
-
-                    new_pos = ghost_decisions(
-                        movement,
-                        game_logic.single(),
-                        new_pos,
-                        0.2,
-                        &mut ghost,
-                        ghost_pos_aim
-                    );
-
-                },
-                GhostActionsStatus::RunningToPen => {
-                    let movement = GHOST_RUNNING_HOME * time.delta_seconds();
-
-                    new_pos = ghost_decisions(
-                        movement,
-                        game_logic.single(),
-                        new_pos,
-                        0.0,
-                        &mut ghost,
-                        PEN_EXIT
-                    );
-
-                    // return the ghost to the pen if the ghost has reached the PEN_EXIT
-                    let diff = (new_pos - PEN_EXIT).abs();
-                    if diff.x < 0.3 && diff.y < 0.3 {
-                        ghost.actions_status = GhostActionsStatus::GoingIntoPen;
-                        new_pos = PEN_EXIT;
-                    }
-                },
-                GhostActionsStatus::GoingIntoPen => {
-                    // move back into the pen - then go back to normal and idle
                 }
-            }
 
 
 
-            // update eyes direction
-            let sprite_index =
+                // update eyes direction
+                let sprite_index =
+                    
+                    if ghost.direction_of_travel.horizontal ==      Horizontal::Right { 0 } // right
+                    else if ghost.direction_of_travel.horizontal == Horizontal::Left  { 1 } // left
+                    else if ghost.direction_of_travel.vertical ==   Vertical::Up      { 2 } // up
+                    else if ghost.direction_of_travel.vertical ==   Vertical::Down    { 3 } // down
+                    else { 4 }; // no direction
                 
-                if ghost.direction_of_travel.horizontal ==      Horizontal::Right { 0 } // right
-                else if ghost.direction_of_travel.horizontal == Horizontal::Left  { 1 } // left
-                else if ghost.direction_of_travel.vertical ==   Vertical::Up      { 2 } // up
-                else if ghost.direction_of_travel.vertical ==   Vertical::Down    { 3 } // down
-                else { 4 }; // no direction
-            
-            // if sprite index is valid, update the sprite index
-            if sprite_index >= indices.first && sprite_index <= indices.last {
-                atlas.index = sprite_index;
-            }
+                // if sprite index is valid, update the sprite index
+                if sprite_index >= indices.first && sprite_index <= indices.last {
+                    atlas.index = sprite_index;
+                }
 
-            // update transforms for both eyes and body
-            let screen_pos = get_screen_coords(new_pos.x, new_pos.y);
-            eye_transform.translation.x = screen_pos.x;
-            eye_transform.translation.y = screen_pos.y;
+                // update transforms for both eyes and body
+                let screen_pos = get_screen_coords(new_pos.x, new_pos.y);
+                eye_transform.translation.x = screen_pos.x;
+                eye_transform.translation.y = screen_pos.y;
 
-            if let Ok(mut body_transform) = ghost_body_transforms.get_mut(ghost.body_entity) {
                 body_transform.translation.x = eye_transform.translation.x;
                 body_transform.translation.y = eye_transform.translation.y;
             }
