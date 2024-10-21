@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-use crate::ghost::{GhostBody,GhostEyes, spawn_ghosts};
-use crate::{AnimationIndicies, AnimationTimer, MultiColoured, Score, LivesLeft};
+use crate::ghost::{spawn_ghosts, Ghost, GhostBody, GhostEyes, GhostActionsStatus, GhostPositionStatus};
+use crate::{AnimationIndicies, AnimationTimer, ConsecutiveKills, LivesLeft, MultiColoured, Score};
 
 use crate::gamestates::{despawn_screen, GameState};
 
@@ -27,7 +27,7 @@ enum BlockType {
 enum BlockReward {
     Nothing,
     PointToken,
-    //GhostWeaknessToken,
+    GhostWeaknessToken,
     //Fruit(String),
 }
 
@@ -64,6 +64,9 @@ pub struct LoseLife(Timer);
 pub struct PointTokenEntity;
 
 #[derive(Component)]
+pub struct GhostWeaknessEntity;
+
+#[derive(Component)]
 pub struct GameLogic {
     pub game_blocks: [[BlockCell; BOARD_WIDTH]; BOARD_HEIGHT],
 }
@@ -81,7 +84,7 @@ impl Plugin for GameLogicPlugin {
         app.add_systems(OnEnter(GameState::LevelSetup), (setup_gameboard, setup_game_objects, move_to_gamestart).chain());
         app.add_systems(OnEnter(GameState::GameStart), (setup_player_object, start_gamestart_timer).chain());
         app.add_systems(Update, gamestart_delay.run_if(in_state(GameState::GameStart)));
-        app.add_systems(Update, (player_movement, check_player_points_collision).run_if(in_state(GameState::Gameplay)));
+        app.add_systems(Update, (player_movement, check_player_points_collision, check_player_weak_token_collision).run_if(in_state(GameState::Gameplay)));
         app.add_systems(Update, check_lose_life_animation.run_if(in_state(GameState::LoseLife)));
         app.add_systems(OnEnter(GameState::LevelComplete), despawn_screen::<OnGameplayScreen>);
         app.add_systems(OnEnter(GameState::GameOver), despawn_screen::<OnGameplayScreen>);
@@ -108,7 +111,7 @@ fn setup_player_object(
         TextureAtlas {
             layout: texture_atlases.add(
                 TextureAtlasLayout::from_grid(
-                    UVec2::new(21, 21),
+                    UVec2::new(22, 22),
                     1, 5, None, None
                 )),
             index: animation_indicies.first,
@@ -129,7 +132,7 @@ fn setup_game_objects(
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
-                custom_size: Some(Vec2::new(410.0, 455.0)),
+                custom_size: Some(Vec2::new(410.0, 456.0)),
                 color: Color::srgb(0.0, 0.0, 1.0),
 
                 ..default()
@@ -147,7 +150,7 @@ fn setup_game_objects(
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
-                custom_size: Some(Vec2::new(410.0, 455.0)), // same size and position as the background
+                custom_size: Some(Vec2::new(410.0, 456.0)), // same size and position as the background
                 color: Color::srgb(0.0, 1.0, 1.0),
 
                 ..default()
@@ -167,6 +170,7 @@ fn setup_game_objects(
 fn setup_gameboard(
     mut commands: Commands,
     mut lives_left: ResMut<LivesLeft>,
+    asset_server: Res<AssetServer>,
 ) {
     lives_left.0 = 3;
 
@@ -180,10 +184,11 @@ fn setup_gameboard(
             const Q: BlockCell = BlockCell {block_type: BlockType::Path, block_reward: BlockReward::Nothing}; // a path but with no point token
             const X: BlockCell = BlockCell {block_type: BlockType::Warp(25,13), block_reward: BlockReward::Nothing}; // X warps to Y
             const Y: BlockCell = BlockCell {block_type: BlockType::Warp(0, 13), block_reward: BlockReward::Nothing}; // Y warps to X
+            const G: BlockCell = BlockCell {block_type: BlockType::Path, block_reward: BlockReward::GhostWeaknessToken}; // Ghost weakness token
 
            [[P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P], // r0
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r1
-            [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r2
+            [G, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, G], // r2
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, P, W, W, W, W, P], // r3
             [P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P], // r4
             [P, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, P], // r5
@@ -197,13 +202,13 @@ fn setup_gameboard(
             [X, Q, P, P, P, P, P, P, P, W, W, W, W, W, W, W, W, P, P, P, P, P, P, P, Q, Y], // r13
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r14
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r15
-            [W, W, W, W, W, P, W, W, P, P, P, P, P, P, P, P, P, P, W, W, P, W, W, W, W, W], // r16
+            [W, W, W, W, W, P, W, W, P, P, P, P, Q, Q, P, P, P, P, W, W, P, W, W, W, W, W], // r16
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r17
             [W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W], // r18
             [P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P], // r19
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, W, W, P], // r20
             [P, W, W, W, W, P, W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, W, W, P], // r21
-            [P, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, P], // r22
+            [G, P, P, W, W, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, W, W, P, P, G], // r22
             [W, W, P, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, P, W, W], // r23
             [W, W, P, W, W, P, W, W, P, W, W, W, W, W, W, W, W, P, W, W, P, W, W, P, W, W], // r24
             [P, P, P, P, P, P, W, W, P, P, P, P, W, W, P, P, P, P, W, W, P, P, P, P, P, P], // r25
@@ -219,25 +224,44 @@ fn setup_gameboard(
 
     for block_row in game_logic.game_blocks {
         for block_cell in block_row {
+            
+            let screen_coords = get_screen_coords(col_index as f32, row_index as f32);
+
             match block_cell.block_reward {
                 BlockReward::PointToken => {
                     // block cell is a point token type
                     // spawn a point token in the bevy commands
-                    let screen_coords = get_screen_coords(col_index as f32, row_index as f32);
-
                     commands.spawn((SpriteBundle {
                         sprite: Sprite {
-                            custom_size: Some(Vec2::new(5.0, 5.0)),
-                            
+                            custom_size: Some(Vec2::new(6.0, 6.0)),
                             ..default()
                         },
                         transform: Transform::from_xyz(
                             screen_coords.x,
                             screen_coords.y,
                             0.0105), // this should be below the warp tunnel z but above the character z level
+                        
+                        texture: asset_server.load("Point_token.png"),
                         ..default()
                     },
                     PointTokenEntity,
+                    OnGameplayScreen));
+                },
+                BlockReward::GhostWeaknessToken => {
+                    commands.spawn((SpriteBundle {
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(16.0, 16.0)),
+                            ..default()
+                        },
+                        transform: Transform::from_xyz(
+                            screen_coords.x,
+                            screen_coords.y,
+                            0.0105),
+                        texture: asset_server.load("Weakness_token.png"),
+                        ..default()
+                    },
+                    
+                    GhostWeaknessEntity,
                     OnGameplayScreen));
                 },
                 _ => (),
@@ -504,6 +528,55 @@ fn check_player_points_collision(
     }
 }
 
+fn check_player_weak_token_collision(
+    player_query: Query<&Transform, With<Player>>,
+    weak_tokens_query: Query<(&Sprite, &Transform, Entity), With<GhostWeaknessEntity>>,
+    mut ghost_query: Query<&mut Ghost>,
+    mut ghost_body_sprites: Query<&mut Sprite, (With<GhostBody>, Without<GhostWeaknessEntity>)>,
+    mut score: ResMut<Score>,
+    mut consecutive_kills: ResMut<ConsecutiveKills>,
+    mut commands: Commands,
+) {
+    let player = player_query.single();
+    let player_rect = Rect::from_center_size(Vec2 {x: player.translation.x, y: player.translation.y}, Vec2 {x: 21.0, y: 21.0});
+
+    for (weak_token_sprite, weak_token_transform, weak_token_entity) in weak_tokens_query.iter() {
+        // check each object for a collision on the transforms
+        let size = 
+        match weak_token_sprite.custom_size {
+            Some(size) => size,
+            None => Vec2 {x: 1.0, y: 1.0}
+        };
+
+        if check_collision(
+            Rect::from_center_size(
+                Vec2 {x: weak_token_transform.translation.x, y: weak_token_transform.translation.y},
+                size), 
+            player_rect)
+        {
+            score.0 += 50;
+            // collision occured - remove the entity and add the associated points to the score
+            commands.entity(weak_token_entity).despawn();
+
+            // reset the consecutive kills value
+            consecutive_kills.0 = 0;
+
+            // send the ghosts into weakened mode
+            for mut ghost in ghost_query.iter_mut() {
+                if let GhostPositionStatus::OutAndAbout = ghost.position_status {
+                    ghost.actions_status = GhostActionsStatus::Weakened;
+
+                    ghost.time_weakened = Some(Timer::from_seconds(8.0, TimerMode::Once));
+
+                    if let Ok(mut ghost_body) = ghost_body_sprites.get_mut(ghost.body_entity) {
+                        ghost_body.color = Color::srgb(0.082, 0.141, 0.380); // a dark navy colour
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn handle_lose_life(
     player: Query<&Transform, With<Player>>,
     mut commands: Commands,
@@ -522,7 +595,7 @@ fn handle_lose_life(
     // spawn a lose life animation here
     commands.spawn((
         SpriteBundle {
-            sprite: Sprite {custom_size: Some(Vec2::new(21.0, 21.0)), ..default()},
+            sprite: Sprite {custom_size: Some(Vec2::new(22.0, 22.0)), ..default()},
             texture: asset_server.load("Pacman_LoseLife_SpriteSheet.png"),
             transform: new_transform,
             ..default()
@@ -530,7 +603,7 @@ fn handle_lose_life(
         TextureAtlas {
             layout: texture_atlases.add(
                                 TextureAtlasLayout::from_grid(
-                                    UVec2::new(21, 21),
+                                    UVec2::new(22, 22),
                                     1, 5, None, None
                                 )),
             index: animation_indicies.first,
@@ -571,7 +644,7 @@ fn check_lose_life_animation(
  */
 pub fn get_screen_coords(col_index: f32, row_index: f32) -> Vec2 {
     Vec2 {
-        x: ((col_index * 15.0) - (SCREEN_WIDTH_PX / 2.0)) + 17.5,
+        x: ((col_index * 15.0) - (SCREEN_WIDTH_PX / 2.0)) + 18.0,
         y: ((((BOARD_HEIGHT as f32 - 1.0) - row_index) * 15.0) - (SCREEN_HEIGHT_PX / 2.0)) + 5.0
     }
 }
@@ -581,7 +654,7 @@ pub fn get_screen_coords(col_index: f32, row_index: f32) -> Vec2 {
  */
 pub fn get_game_board_coords(pos: Vec2) -> Vec2 {
     Vec2 {
-        x: ((pos.x - 17.5) + (SCREEN_WIDTH_PX / 2.0)) / 15.0,
+        x: ((pos.x - 18.0) + (SCREEN_WIDTH_PX / 2.0)) / 15.0,
         y: (BOARD_HEIGHT as f32 - 1.0) - (((pos.y - 5.0) + (SCREEN_HEIGHT_PX / 2.0)) / 15.0)
     }
 }

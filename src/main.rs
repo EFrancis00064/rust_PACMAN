@@ -16,6 +16,9 @@ mod gamestates;
 pub struct Score(pub i32);
 
 #[derive(Resource)]
+pub struct ConsecutiveKills(pub i32);
+
+#[derive(Resource)]
 pub struct CurrentColour(f32);
 
 #[derive(Resource)]
@@ -41,7 +44,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "PACMAN in Bevy and Rust".into(),
-                        resolution: (410.0, 470.0).into(),
+                        resolution: (410.0, 476.0).into(),
                         resizable: false,
                         ..default()
                     }),
@@ -55,6 +58,7 @@ fn main() {
         .insert_resource(Score(0))
         .insert_resource(CurrentColour(0.0))
         .insert_resource(LivesLeft(0))
+        .insert_resource(ConsecutiveKills(0))
         .init_state::<GameState>() // in later versions of bevy this is init_state
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
