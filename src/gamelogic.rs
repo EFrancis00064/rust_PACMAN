@@ -86,7 +86,6 @@ impl Plugin for GameLogicPlugin {
         app.add_systems(Update, gamestart_delay.run_if(in_state(GameState::GameStart)));
         app.add_systems(Update, (player_movement, check_player_points_collision, check_player_weak_token_collision).run_if(in_state(GameState::Gameplay)));
         app.add_systems(Update, check_lose_life_animation.run_if(in_state(GameState::LoseLife)));
-        app.add_systems(OnEnter(GameState::LevelComplete), despawn_screen::<OnGameplayScreen>);
         app.add_systems(OnEnter(GameState::GameOver), despawn_screen::<OnGameplayScreen>);
         app.add_systems(OnEnter(GameState::LoseLife), (handle_lose_life, despawn_screen::<Player>).chain());
         app.add_systems(OnExit(GameState::LoseLife), ((despawn_screen::<LoseLife>, despawn_screen::<GhostBody>, despawn_screen::<GhostEyes>), spawn_ghosts).chain());
@@ -172,12 +171,12 @@ fn setup_gameboard(
     mut lives_left: ResMut<LivesLeft>,
     asset_server: Res<AssetServer>,
 ) {
-    lives_left.0 = 3;
+    if lives_left.0 == 0 {
+        lives_left.0 = 3;
+    }
 
     let game_logic: GameLogic = GameLogic {
     // initialise all the game blocks to default values (as a wall)
-        //game_blocks: [[BlockCell::default(); BOARD_HEIGHT]; BOARD_WIDTH], //[[BlockCell {exit_path_count: 0, block_type: BlockType::Wall, block_reward:BlockReward::Nothing}; 20]; 24];
-
         game_blocks: {
             const W: BlockCell = BlockCell {block_type: BlockType::Wall, block_reward: BlockReward::Nothing};
             const P: BlockCell = BlockCell {block_type: BlockType::Path, block_reward: BlockReward::PointToken};
@@ -215,6 +214,37 @@ fn setup_gameboard(
             [P, W, W, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, W, W, P], // r26
             [P, W, W, W, W, W, W, W, W, W, W, P, W, W, P, W, W, W, W, W, W, W, W, W, W, P], // r27
             [P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P]] // r28
+
+            // This is for testing a board that is easy to beat
+            /*[[Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, W, W, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q], // r0
+            [Q, W, W, W, W, Q, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, Q, W, W, W, W, Q], // r1
+            [Q, W, W, W, W, Q, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, Q, W, W, W, W, Q], // r2
+            [Q, W, W, W, W, Q, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, Q, W, W, W, W, Q], // r3
+            [Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q], // r4
+            [Q, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, Q], // r5
+            [Q, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, Q], // r6
+            [Q, Q, Q, Q, Q, Q, W, W, Q, Q, Q, Q, W, W, Q, Q, Q, Q, W, W, Q, Q, Q, Q, Q, Q], // r7
+            [W, W, W, W, W, Q, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, Q, W, W, W, W, W], // r8
+            [W, W, W, W, W, Q, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, Q, W, W, W, W, W], // r9
+            [W, W, W, W, W, Q, W, W, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, W, W, Q, W, W, W, W, W], // r10
+            [W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W], // r11
+            [W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W], // r12
+            [X, Q, Q, Q, Q, Q, Q, Q, Q, W, W, W, W, W, W, W, W, Q, Q, Q, Q, Q, Q, Q, Q, Y], // r13
+            [W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W], // r14
+            [W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W], // r15
+            [W, W, W, W, W, Q, W, W, Q, Q, P, P, Q, Q, P, P, Q, Q, W, W, Q, W, W, W, W, W], // r16
+            [W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W], // r17
+            [W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W], // r18
+            [Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, W, W, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q], // r19
+            [Q, W, W, W, W, Q, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, W, W, Q], // r20
+            [Q, W, W, W, W, Q, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, W, W, Q], // r21
+            [Q, Q, Q, W, W, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, W, W, Q, Q, G], // r22
+            [W, W, Q, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, Q, W, W], // r23
+            [W, W, Q, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, Q, W, W], // r24
+            [Q, Q, Q, Q, Q, Q, W, W, Q, Q, Q, Q, W, W, Q, Q, Q, Q, W, W, Q, Q, Q, Q, Q, Q], // r25
+            [Q, W, W, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, W, W, Q], // r26
+            [Q, W, W, W, W, W, W, W, W, W, W, Q, W, W, Q, W, W, W, W, W, W, W, W, W, W, Q], // r27
+            [Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q, Q]] // r28*/
         }
     };
 
@@ -484,49 +514,47 @@ fn player_movement(
 fn check_player_points_collision(
     player_query: Query<&Transform, With<Player>>,
     point_tokens_query: Query<(&Sprite, &Transform, Entity), With<PointTokenEntity>>,
+    weak_tokens_query: Query<&GhostWeaknessEntity>,
     mut commands: Commands,
     mut score: ResMut<Score>,
     mut game_state: ResMut<NextState<GameState>>,
 ) {
-    let player = player_query.single();
-    let player_rect = Rect::from_center_size(Vec2 {x: player.translation.x, y: player.translation.y}, Vec2 {x: 21.0, y: 21.0});
-
-    //let player_bounding_rect = Rect::from_center_size(Vec2 {x: player.translation.x, y: player.translation.y}, Vec2 {x: 15.0, y: 15.0});
-    let mut point_token_counts = 0;
-    let mut point_token_eaten = false;
-    for (point_token_sprite, point_token_transform, point_token_entity) in point_tokens_query.iter() {
-        // check each object for a collision on the transforms
-
-        point_token_counts += 1;
-
-
-        let size = 
-        match point_token_sprite.custom_size {
-            Some(size) => size,
-            None => Vec2 {x: 1.0, y: 1.0}
-        };
-
-        if check_collision(
-            Rect::from_center_size(
-                Vec2 {x: point_token_transform.translation.x, y: point_token_transform.translation.y},
-                size), 
-            player_rect)
-        {
-            score.0 += 10;
-            // collision occured - remove the entity and add the associated points to the score
-            commands.entity(point_token_entity).despawn();
-
-            point_token_eaten = true;
-        }
-    }
-
-    // check if we have eaten all the point tokens now
-    if point_token_eaten {
-        if point_token_counts <= 1 {
+    if point_tokens_query.is_empty() {
+        if weak_tokens_query.is_empty() {
             game_state.set(GameState::LevelComplete);
+        }
+    } else {
+        let player = player_query.single();
+        let player_rect = Rect::from_center_size(Vec2 {x: player.translation.x, y: player.translation.y}, Vec2 {x: 21.0, y: 21.0});
+
+        for (point_token_sprite, point_token_transform, point_token_entity) in point_tokens_query.iter() {
+            // check each object for a collision on the transforms
+
+            let size = 
+            match point_token_sprite.custom_size {
+                Some(size) => size,
+                None => Vec2 {x: 1.0, y: 1.0}
+            };
+
+            if check_collision(
+                Rect::from_center_size(
+                    Vec2 {x: point_token_transform.translation.x, y: point_token_transform.translation.y},
+                    size), 
+                player_rect)
+            {
+                score.0 += 10;
+                // collision occured - remove the entity and add the associated points to the score
+                commands.entity(point_token_entity).despawn();
+            }
         }
     }
 }
+
+/*fn move_to_level_setup(
+    mut game_state: ResMut<NextState<GameState>>,
+) {
+    game_state.set(GameState::LevelSetup);
+}*/
 
 fn check_player_weak_token_collision(
     player_query: Query<&Transform, With<Player>>,

@@ -14,6 +14,7 @@ impl Plugin for SplashPlugin {
         app
             .add_systems(OnEnter(GameState::SplashScreen), splash_setup)
             .add_systems(Update, check_start_pressed.run_if(in_state(GameState::SplashScreen)))
+            .add_systems(Update, check_start_pressed.run_if(in_state(GameState::LevelComplete)))
             .add_systems(OnExit(GameState::SplashScreen), despawn_screen::<OnSplashScreen>);
     }
 }
@@ -25,8 +26,8 @@ fn splash_setup(mut commands: Commands) {
                 style: Style {
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
+                    justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
-                    justify_items: JustifyItems::Center,
                     padding: UiRect::all(Val::Px(10.0)),
                     ..default()
                 },
@@ -44,9 +45,9 @@ fn splash_setup(mut commands: Commands) {
                         font_size: 20.0,
                         ..default()
                     }
-                ),
+                ).with_justify(JustifyText::Center),
                 ..default()
-            }.with_text_justify(JustifyText::Center),
+            }
         );
     });
 }
