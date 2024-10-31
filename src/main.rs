@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 //use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use ghost::GhostPlugin;
+use scoreboard::ScoreBoardPlugin;
 use ui::GameUI;
 use gamelogic::GameLogicPlugin;
 use splashscreen::SplashPlugin;
@@ -11,6 +12,7 @@ mod ui;
 mod gamelogic;
 mod splashscreen;
 mod gamestates;
+mod scoreboard;
 
 #[derive(Resource)]
 pub struct Score(pub i32);
@@ -54,7 +56,7 @@ fn main() {
         //.add_plugins(
         //    WorldInspectorPlugin::default(),
         //)
-        .add_plugins((SplashPlugin, GhostPlugin, GameUI, GameLogicPlugin))
+        .add_plugins((SplashPlugin, GhostPlugin, GameUI, GameLogicPlugin, ScoreBoardPlugin))
         .insert_resource(Score(0))
         .insert_resource(CurrentColour(0.0))
         .insert_resource(LivesLeft(0))
