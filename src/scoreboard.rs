@@ -1,27 +1,40 @@
 use std::{fs::File, io::{prelude::*, BufReader}};
 
-use bevy::prelude::*;
+use bevy::{input::{keyboard::{Key, KeyboardInput}, ButtonState}, prelude::*};
 
 use crate::{gamestates::GameState, Score};
 
 #[derive(Component)]
 pub struct OnGameOverScreen;
 
+#[derive(Component)]
+pub struct PlayerLeaderboardEntry;
+
+#[derive(Component)]
+pub struct PassiveLeaderboardEntry;
+
 pub struct ScoreBoardPlugin;
 
 impl Plugin for ScoreBoardPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(GameState::GameOver), setup_scoreboard);
+        app.add_systems(Update, player_initials.run_if(in_state(GameState::GameOver)));
     }
+}
+
+struct LeaderboardItem {
+    name: String,
+    score: String,
+    score_num: i32,
+    is_current_player: bool,
 }
 
 fn setup_scoreboard(
     mut commands: Commands,
     score: Res<Score>,
 ) {
-    info!("Running setup_scoreboard");
-
-    let mut leaderboard: Vec<(String, String)> = Vec::new();
+    // structure of leaderboard
+    let mut leaderboard: Vec<LeaderboardItem> = Vec::new();
     let mut leaderboard_has_space = true;
     let mut leaderboard_lowest = -1;
 
@@ -42,7 +55,10 @@ fn setup_scoreboard(
                     if let Some(score) = split_strings.next() { // get the second item in the split
                         if let Ok(score_number) = score.parse::<i32>() { // get the score as a number from the score string
 
-                            leaderboard.push((name.to_string(), score.to_string()));
+                            leaderboard.push(
+                                LeaderboardItem {
+                                    name: name.to_string(), score: score.to_string(), score_num: score_number, is_current_player: false
+                                });
 
                             if score_number < leaderboard_lowest || leaderboard_lowest == -1 {
                                 leaderboard_lowest = score_number;
@@ -62,7 +78,21 @@ fn setup_scoreboard(
     // check if the new score makes it onto the leaderboard
     let player_on_leaderboard = leaderboard_has_space || score.0 > leaderboard_lowest;
 
-    //if let Ok((last_score, last)leaderboard.iter().last()
+    if player_on_leaderboard {
+        // insert the current player into the leaderboard
+
+        // find the index on the leaderboard for the player
+        let mut insert_index = 0;
+
+        for leaderboard_item in &leaderboard {
+            // move down the leaderboard increasing our index each time we come across a value that is larger than the current score
+            if leaderboard_item.score_num > score.0 {
+                insert_index += 1;
+            }
+        }
+
+        leaderboard.insert(insert_index as usize, LeaderboardItem {name: "___".to_string(), score: score.0.to_string(), score_num: score.0, is_current_player: true});
+    }
 
     // display the leaderboard on the screen
 
@@ -130,23 +160,73 @@ fn setup_scoreboard(
         }).with_children(| leaderboard_area | {
 
             // now spawn the leaderboard items
-            for (mut leaderboard_name, leaderboard_score) in leaderboard {
+            for leaderboard_item in leaderboard {
 
+                let mut leaderboard_string = leaderboard_item.name;
                 // concatenate the leaderboard name and string with some spaces as separators
-                leaderboard_name.push_str("  ");
-                leaderboard_name.push_str(&leaderboard_score);
+                leaderboard_string.push_str("  ");
+                leaderboard_string.push_str(&leaderboard_item.score);
 
-                leaderboard_area.spawn(TextBundle {
-                    text: Text::from_section(
-                        &leaderboard_name,
-                        TextStyle {
-                            font_size: 20.0,
+                let text = Text::from_section(
+                    &leaderboard_string,
+                     TextStyle {
+                        font_size: 20.0,
+                        color: 
+                            if leaderboard_item.is_current_player {Color::linear_rgb(0.0, 0.3, 0.0)}
+                            else {Color::linear_rgb(1.0, 1.0, 1.0)},
+                        ..default()
+                    });
+
+                if leaderboard_item.is_current_player {
+                    leaderboard_area.spawn((
+                        TextBundle {
+                            text,
+                            background_color: BackgroundColor::from(Color::linear_rgb(1.0, 1.0, 1.0)),
                             ..default()
-                        }),
-                    ..default()
-                });
+                        },
+                        PlayerLeaderboardEntry,
+                        ));
+                } else {
+                    leaderboard_area.spawn((
+                        TextBundle {
+                            text,
+                            ..default()
+                        },
+                        PassiveLeaderboardEntry,
+                    ));
+                }
             }
         });
     });
 
+}
+
+fn player_initials(
+    mut lb_player_entry: Query<&mut Text, With<PlayerLeaderboardEntry>>,
+    mut event_reader_keys: EventReader<KeyboardInput>,
+) {
+    for ev in event_reader_keys.read() {
+        if ev.state == ButtonState::Released {
+            continue;
+        }
+
+        match &ev.logical_key {
+            Key::Enter => {
+
+            },
+            Key::Backspace => {
+
+            },
+            Key::Character(input) => {
+                if input.chars().any(|c| c.is_control() || !c.is_alphabetic() ) {
+                    continue;
+                }
+
+                if let Some(section) = lb_player_entry.single_mut().sections.first_mut() {
+                    section.value = section.value.replacen('_', &input.to_uppercase(), 1);
+                }
+            },
+            _ => {}
+        }
+    }
 }
