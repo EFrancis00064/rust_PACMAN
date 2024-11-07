@@ -24,7 +24,6 @@ impl Plugin for ScoreBoardPlugin {
 
 struct LeaderboardItem {
     name: String,
-    score: String,
     score_num: i32,
     is_current_player: bool,
 }
@@ -57,7 +56,7 @@ fn setup_scoreboard(
 
                             leaderboard.push(
                                 LeaderboardItem {
-                                    name: name.to_string(), score: score.to_string(), score_num: score_number, is_current_player: false
+                                    name: name.to_string(), score_num: score_number, is_current_player: false
                                 });
 
                             if score_number < leaderboard_lowest || leaderboard_lowest == -1 {
@@ -91,7 +90,7 @@ fn setup_scoreboard(
             }
         }
 
-        leaderboard.insert(insert_index as usize, LeaderboardItem {name: "___".to_string(), score: score.0.to_string(), score_num: score.0, is_current_player: true});
+        leaderboard.insert(insert_index as usize, LeaderboardItem {name: "___".to_string(), score_num: score.0, is_current_player: true});
     }
 
     // display the leaderboard on the screen
@@ -162,10 +161,7 @@ fn setup_scoreboard(
             // now spawn the leaderboard items
             for leaderboard_item in leaderboard {
 
-                let mut leaderboard_string = leaderboard_item.name;
-                // concatenate the leaderboard name and string with some spaces as separators
-                leaderboard_string.push_str("  ");
-                leaderboard_string.push_str(&leaderboard_item.score);
+                let leaderboard_string = format!("{} {:>8}", &leaderboard_item.name, leaderboard_item.score_num); // max score will be 99,999,999
 
                 let text = Text::from_section(
                     &leaderboard_string,
@@ -210,23 +206,36 @@ fn player_initials(
             continue;
         }
 
-        match &ev.logical_key {
-            Key::Enter => {
+        if let Some(section) = lb_player_entry.single_mut().sections.first_mut() {
 
-            },
-            Key::Backspace => {
+            match &ev.logical_key {
+                Key::Enter => {
 
-            },
-            Key::Character(input) => {
-                if input.chars().any(|c| c.is_control() || !c.is_alphabetic() ) {
-                    continue;
-                }
+                },
+                Key::Backspace => {
+                    // get the position of the last user entered character
+                    // go through each of the characters from the beginning to find this
+                    let mut index = 0;
+                    let mut iterator = section.value.chars();
+                    while index <= 2 && iterator.next() != Some('_') {
+                        index += 1;
+                    }
 
-                if let Some(section) = lb_player_entry.single_mut().sections.first_mut() {
+                    // check if there are any characters to backspace
+                    if index > 0 {
+                        section.value.replace_range(index-1..index, "_");
+                    }
+                },
+                Key::Character(input) => {
+                    if input.chars().any(|c| c.is_control() || !c.is_alphabetic() ) {
+                        continue;
+                    }
+                    
                     section.value = section.value.replacen('_', &input.to_uppercase(), 1);
-                }
-            },
-            _ => {}
+                    
+                },
+                _ => {}
+            }
         }
     }
 }
