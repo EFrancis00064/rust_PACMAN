@@ -1,8 +1,8 @@
-use std::{fs::File, io::{prelude::*, BufReader}};
+use std::{fs::{self, File}, io::{prelude::*, BufReader}};
 
 use bevy::{input::{keyboard::{Key, KeyboardInput}, ButtonState}, prelude::*};
 
-use crate::{gamestates::GameState, Score};
+use crate::{gamestates::{despawn_screen, GameState}, Score};
 
 #[derive(Component)]
 pub struct OnGameOverScreen;
@@ -19,14 +19,19 @@ impl Plugin for ScoreBoardPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(GameState::GameOver), setup_scoreboard);
         app.add_systems(Update, player_initials.run_if(in_state(GameState::GameOver)));
+        app.add_systems(OnExit(GameState::GameOver), (save_scoreboard, despawn_screen::<OnGameOverScreen>).chain());
     }
 }
 
+#[derive(Component, Clone)]
 struct LeaderboardItem {
     name: String,
     score_num: i32,
     is_current_player: bool,
 }
+
+#[derive(Component, Clone)]
+struct Rank(u32);
 
 fn setup_scoreboard(
     mut commands: Commands,
@@ -105,6 +110,7 @@ fn setup_scoreboard(
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
+            background_color: Color::BLACK.into(),
             ..default()
         },
         OnGameOverScreen,
@@ -135,21 +141,23 @@ fn setup_scoreboard(
                     }),
                 ..default()
             });
-            gameover_message.spawn(TextBundle {
-                text: Text::from_section(
-                    "Enter your initials:",
-                    TextStyle {
-                        font_size: 20.0,
-                        ..default()
-                    }),
-                ..default()
-            });
+            if player_on_leaderboard {
+                gameover_message.spawn(TextBundle {
+                    text: Text::from_section(
+                        "Enter your initials:",
+                        TextStyle {
+                            font_size: 20.0,
+                            ..default()
+                        }),
+                    ..default()
+                });
+            }
         });
 
-        screen.spawn(NodeBundle { // High score message / game over message
+        screen.spawn(NodeBundle { // Leaderboard
             style: Style {
                 width: Val::Percent(100.0),
-                height: Val::Percent(70.0),
+                height: Val::Percent(50.0),
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
                 flex_direction: FlexDirection::Column,
@@ -158,6 +166,7 @@ fn setup_scoreboard(
             ..default()
         }).with_children(| leaderboard_area | {
 
+            let mut lb_rank = 1;
             // now spawn the leaderboard items
             for leaderboard_item in leaderboard {
 
@@ -181,6 +190,8 @@ fn setup_scoreboard(
                             ..default()
                         },
                         PlayerLeaderboardEntry,
+                        leaderboard_item,
+                        Rank(lb_rank),
                         ));
                 } else {
                     leaderboard_area.spawn((
@@ -189,9 +200,35 @@ fn setup_scoreboard(
                             ..default()
                         },
                         PassiveLeaderboardEntry,
+                        leaderboard_item,
+                        Rank(lb_rank),
                     ));
                 }
+
+                lb_rank += 1;
             }
+        });
+
+        screen.spawn(NodeBundle { // High score message / game over message
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Percent(20.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            ..default()
+        }).with_children(| continue_message | {
+            continue_message.spawn(TextBundle {
+                text: Text::from_section(
+                    "Press start to continue",
+                    TextStyle {
+                        font_size: 20.0,
+                        ..default()
+                    }),
+                ..default()
+            });
         });
     });
 
@@ -200,42 +237,108 @@ fn setup_scoreboard(
 fn player_initials(
     mut lb_player_entry: Query<&mut Text, With<PlayerLeaderboardEntry>>,
     mut event_reader_keys: EventReader<KeyboardInput>,
+    mut game_state: ResMut<NextState<GameState>>,
 ) {
     for ev in event_reader_keys.read() {
         if ev.state == ButtonState::Released {
             continue;
         }
 
-        if let Some(section) = lb_player_entry.single_mut().sections.first_mut() {
+        if let Ok(mut lb_player_entry) = lb_player_entry.get_single_mut() {
+            if let Some(section) = lb_player_entry.sections.first_mut() {
 
+                match &ev.logical_key {
+                    Key::Space => {
+                        // move on to continue - go back to splashscreen
+                        game_state.set(GameState::SplashScreen);
+                    },
+                    Key::Backspace => {
+                        // get the position of the last user entered character
+                        // go through each of the characters from the beginning to find this
+                        let mut index = 0;
+                        let mut iterator = section.value.chars();
+                        while index <= 2 && iterator.next() != Some('_') {
+                            index += 1;
+                        }
+
+                        // check if there are any characters to backspace
+                        if index > 0 {
+                            section.value.replace_range(index-1..index, "_");
+                        }
+                    },
+                    Key::Character(input) => {
+                        if input.chars().any(|c| c.is_control() || !c.is_alphabetic() ) {
+                            continue;
+                        }
+                        
+                        section.value = section.value.replacen('_', &input.to_uppercase(), 1);
+                        
+                    },
+                    _ => {}
+                }
+            }
+        } else {
+            // no player entry to be gotten
+            // just check if the start button has been pressed
             match &ev.logical_key {
-                Key::Enter => {
-
+                Key::Space => {
+                    game_state.set(GameState::LevelSetup);
                 },
-                Key::Backspace => {
-                    // get the position of the last user entered character
-                    // go through each of the characters from the beginning to find this
-                    let mut index = 0;
-                    let mut iterator = section.value.chars();
-                    while index <= 2 && iterator.next() != Some('_') {
-                        index += 1;
-                    }
-
-                    // check if there are any characters to backspace
-                    if index > 0 {
-                        section.value.replace_range(index-1..index, "_");
-                    }
-                },
-                Key::Character(input) => {
-                    if input.chars().any(|c| c.is_control() || !c.is_alphabetic() ) {
-                        continue;
-                    }
-                    
-                    section.value = section.value.replacen('_', &input.to_uppercase(), 1);
-                    
-                },
-                _ => {}
+                _ => {},
             }
         }
+        
     }
+}
+
+fn save_scoreboard(
+    leaderboard_items: Query<(&LeaderboardItem, &Rank)>,
+    player_lb_entry: Query<&Text, With<PlayerLeaderboardEntry>>,
+    mut score: ResMut<Score>,
+) {
+    if leaderboard_items.is_empty() {
+        // early quit if player isnt currently on the scoreboard
+        return;
+    }
+
+    let mut leaderboard: Vec<(Rank, LeaderboardItem)> = Vec::new();
+    for (lb_item, rank) in leaderboard_items.iter() {
+        leaderboard.push((rank.clone(), lb_item.clone()));
+    }
+
+    // sorts by rank only (ascending)
+    leaderboard.sort_by(| a,b | {
+        a.0.0.cmp(&b.0.0)
+    });
+
+    // limit the leaderboard to 10
+    leaderboard = leaderboard.into_iter().take(10).collect();
+
+    let mut file_output = String::default();
+    for (_, lb_item) in leaderboard {
+        file_output.push_str(&format!("{}:{:?}\n",
+        if lb_item.is_current_player {
+            let mut player_name_string = "   ".to_string();
+            if let Ok(player_name) = player_lb_entry.get_single() {
+                if let Some(player_name) = player_name.sections.first() {
+                    let player_name: String = player_name.value.chars().into_iter().take(3).collect();
+                    player_name_string = player_name.replace("_", " ");
+                }
+            }
+            player_name_string
+        } else {
+            lb_item.name
+        },
+        lb_item.score_num));
+    }
+
+    match fs::write("leaderboard.txt", file_output) {
+        Err(_) => {
+            info!("Cannot write to leaderboard!");
+        },
+        _ => {},
+    }
+
+    // reset score to 0
+    score.0 = 0;
 }
