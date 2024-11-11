@@ -20,6 +20,7 @@ pub struct GameUI;
 impl Plugin for GameUI {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_game_ui)
+            .add_systems(OnEnter(GameState::LevelSetup), spawn_hearts_ui)
             .add_systems(Update, update_score_ui)
             .add_systems(OnExit(GameState::LoseLife), update_lives_ui)
             .add_systems(OnEnter(GameState::LevelComplete), (despawn_screen::<OnGameplayScreen>, setup_level_complete, add_life_ui).chain())
@@ -29,7 +30,6 @@ impl Plugin for GameUI {
 
 fn spawn_game_ui(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
 ) {
     commands
         .spawn((
@@ -90,24 +90,31 @@ fn spawn_game_ui(
                     ..default()
                 },
                 HeartContainer,
-            ))
-            .with_children(|heart_node| {
-                for i in 0..3 {
-                    let icon = asset_server.load("Heart.png");
-                    info!("Spawning heart entity: {:?}", heart_node.spawn((
-                        ImageBundle {
-                            style: Style {
-                                width: Val::Px(20.0),
-                                ..default()
-                            },
-                            image: UiImage::new(icon),
-                            ..default()
-                        },
-                        HeartLife(i),
-                    )).id());
-                }
-            });
+            ));
         });
+}
+
+fn spawn_hearts_ui(
+    heart_container: Query<Entity, With<HeartContainer>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    commands.entity(heart_container.single()).with_children( | container | {
+        for i in 0..3 {
+            let icon = asset_server.load("Heart.png");
+            container.spawn((
+                ImageBundle {
+                    style: Style {
+                        width: Val::Px(20.0),
+                        ..default()
+                    },
+                    image: UiImage::new(icon),
+                    ..default()
+                },
+                HeartLife(i),
+            ));
+        }
+    });
 }
 
 
